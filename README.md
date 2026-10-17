@@ -208,6 +208,8 @@ ZIP 文件名仍为 `<书名>_分卷.zip`。项目目录导出写入项目根的
 
 插件可以规范化“导出词条”（标题、正文、编号、类型），并提供专用导出变量。TXT / ZIP / 文件夹 / EPUB 与单章导出共用同一套规范化与模板。插件开关和导出模板保存在 localStorage，不依赖 IndexedDB 或本地服务器。
 
+哪些功能适合迁出本体、核心边界与 v2 词条/变量规划，见 `plugins/ARCHITECTURE.md`。
+
 默认模板与旧版导出一致：
 
 ```text
@@ -224,6 +226,7 @@ header:       "{{title}}"
 plugins/
 ├─ README.md
 ├─ API.md
+├─ ARCHITECTURE.md            # 插件化拆分路线与 v2 设计
 ├─ index.js                  # 生成脚本产物
 ├─ schema/plugin.schema.json
 ├─ _template/                # 复制它开始写插件

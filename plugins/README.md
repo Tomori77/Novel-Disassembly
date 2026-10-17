@@ -3,6 +3,7 @@
 RP Disassembly 的导出插件放在这里。插件可以规范化导出词条（标题、正文、编号、类型）、提供专用变量，并配合模板改变导出路径、文件名与内容头。
 
 - 完整接口：`plugins/API.md`
+- 插件化拆分路线与词条/v2 设计：`plugins/ARCHITECTURE.md`
 - 插件页：index.html → 侧栏“插件”
 - 默认不启用任何插件，默认导出结果与以前一致
 - 插件是本地经典脚本，兼容 `file://` 双击打开；无依赖、无构建、不能联网安装
@@ -13,6 +14,7 @@ RP Disassembly 的导出插件放在这里。插件可以规范化导出词条�
 plugins/
 ├─ README.md
 ├─ API.md
+├─ ARCHITECTURE.md           # 哪些能力应插件化、核心边界、v2 词条与变量
 ├─ index.js                  # 由生成脚本创建，勿手工修改
 ├─ schema/plugin.schema.json
 ├─ _template/                # 复制这个目录开始写插件（生成脚本会跳过）
