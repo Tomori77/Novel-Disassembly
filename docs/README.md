@@ -1,6 +1,6 @@
 # 项目文档索引
 
-RP Disassembly 是纯前端的“卷 → 节”拆解器，可选插件扩展导出/导入/分析能力。本目录是工程文档；面向使用者的说明在根目录 [`README.md`](../README.md)，插件 SDK 在 [`plugins/`](../plugins/)。
+Novel-Disassembly 是纯前端的“卷 → 节”拆解器，可选插件扩展导出/导入/分析能力。本目录是工程文档；面向使用者的说明在根目录 [`README.md`](../README.md)，插件 SDK 在 [`plugins/`](../plugins/)。
 
 ## 建议阅读顺序
 

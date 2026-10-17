@@ -2,7 +2,7 @@
 
 版本：`apiVersion: 1`
 
-本文档描述 RP Disassembly 的导出插件接口、词条模型、加载流程、变量、模板与安全边界。插件是普通经典脚本（非 ES module），通过 `window.RP.plugins.register(def)` 注册，兼容 `file://` 双击打开。
+本文档描述 Novel-Disassembly 的导出插件接口、词条模型、加载流程、变量、模板与安全边界。插件是普通经典脚本（非 ES module），通过 `window.RP.plugins.register(def)` 注册，兼容 `file://` 双击打开。
 
 ---
 

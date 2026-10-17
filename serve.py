@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Local-only static server for RP Disassembly.
+"""Local-only static server for Novel-Disassembly.
 
 Serves the project directory plus a small write API used by the browser:
 
@@ -188,7 +188,7 @@ def write_export(data):
 
 
 class Handler(SimpleHTTPRequestHandler):
-    server_version = "RPDisassembly/1.0"
+    server_version = "NovelDisassembly/1.0"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT), **kwargs)
@@ -342,7 +342,7 @@ class Server(ThreadingHTTPServer):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="RP Disassembly local server")
+    parser = argparse.ArgumentParser(description="Novel-Disassembly local server")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="listen port (default 8765)")
     parser.add_argument("--open", action="store_true", help="open the app in the default browser")
     args = parser.parse_args(argv)
@@ -362,7 +362,7 @@ def main(argv=None):
             print("无法监听 127.0.0.1:%d：%s" % (args.port, error), file=sys.stderr)
         return 1
 
-    print("RP Disassembly 已启动：%s" % url)
+    print("Novel-Disassembly 已启动：%s" % url)
     print("项目根目录：%s" % ROOT)
     print("导出目录：%s" % EXPORT_ROOT)
     print("仅监听 127.0.0.1；按 Ctrl+C 停止。")

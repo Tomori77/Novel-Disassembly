@@ -1,4 +1,4 @@
-﻿# 生成 RP Disassembly 插件清单
+﻿# 生成 Novel-Disassembly 插件清单
 # 用法：在项目根目录运行 powershell -File tools/build-plugins.ps1
 # 扫描 plugins/*/plugin.json（跳过 _template），校验必填项后生成 plugins/index.js。
 
