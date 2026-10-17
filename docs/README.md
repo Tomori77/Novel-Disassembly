@@ -21,7 +21,7 @@ Novel-Disassembly 是纯前端的“卷 → 节”拆解器，可选插件扩展
 | [export-formats.md](export-formats.md) | TXT/ZIP/EPUB 现状；Markdown/JSON/DOCX 设计 | 部分实现 |
 | [import-formats.md](import-formats.md) | TXT/ZIP/文件夹现状；EPUB/DOCX/MD 设计 | 部分实现 |
 | [search-stats.md](search-stats.md) | 全文/正则搜索、卷统计、阅读时长 | 设计 |
-| [ai-analysis.md](ai-analysis.md) | 模型配置、摘要、人物/事件/伏笔抽取 | 设计 |
+| [ai-analysis.md](ai-analysis.md) | 模型配置、摘要、人物/事件/伏笔抽取 | 已实现（MVP） |
 | [development.md](development.md) | 运行、构建插件、测试、仓库约定 | 已实现 |
 | [`plugins/API.md`](../plugins/API.md) | 当前插件 API 完整参考 | v1 已实现 |
 | [`plugins/ARCHITECTURE.md`](../plugins/ARCHITECTURE.md) | 哪些功能适合插件化、迁移路线 | 设计 |

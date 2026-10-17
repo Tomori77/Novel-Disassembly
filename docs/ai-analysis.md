@@ -34,6 +34,7 @@
 ```
 
 - 默认模型与并发数可配；并发建议 2–4。
+- **MVP 现状**：不并发，按章节顺序执行；无自动重试、费用上限与断点续跑。
 - 每章独立任务，记录状态：`pending / running / done / failed / skipped`。
 - 失败重试（指数退避，最多 3 次）；可跳过单章继续。
 - 支持中断续跑：按章节 id 记录进度。
@@ -75,9 +76,12 @@
 
 ## 6. 存储
 
-- 插件存储：`plugin:ai-analysis:config`、`plugin:ai-analysis:progress`、`plugin:ai-analysis:summary:<chapterId>`。
-- 实体词条写入书的实体集合（v2），随书持久化。
-- 导出 JSON 时包含实体；Markdown 可选附录；TXT/ZIP/EPUB 不输出。
+- 插件存储（IndexedDB `pluginData`，按 `pluginId` 隔离）：
+  - `config`：`{ preset, baseUrl, model, apiKey, skipExcluded }`；
+  - `book:<bookId 或 fileName>`：`{ chapters, volumeSummaries, bookSummary, updatedAt }`。
+- 章节结果按 `chapterId` 保存，每章完成后立即写入；卷/全书摘要由已有摘要二次生成。
+- 实体目前只存在章节结果中，尚未写入 v2 `entity` 词条集合。
+- 导出 JSON 时尚未包含实体；Markdown/TXT/ZIP/EPUB 不输出 AI 结果。
 
 ## 7. UI
 
@@ -108,4 +112,24 @@
 
 ## 10. 状态
 
-设计完成，待实现（官方插件）。
+**已实现（MVP）**：官方插件 `plugins/ai-analysis/`。
+
+### 已实现
+
+- OpenAI 兼容直连：Base URL、模型、API Key、预设；Key 只存插件存储。
+- 手动触发，顺序执行：当前章 / 指定卷 / 全书，单次最多 50 章。
+- 分析前确认章节数与 token 估算；分析中可停止，保留已完成结果。
+- 章节摘要、关键事件、人物/事件/伏笔实体；失败章节记录错误并继续。
+- 卷摘要（章节摘要汇总）与全书摘要（优先卷摘要）。
+- 结果按书持久化，刷新后保留；支持清空本书结果。
+- 401 / 429 / CORS / 超时的可读错误提示。
+- 所有正文与摘要使用 `textContent` 渲染，避免 XSS。
+
+### 未实现
+
+- 导出集成：实体尚未写入 v2 词条，也不进入 JSON/Markdown/manifest。
+- 并发请求、自动重试与指数退避。
+- 成本价格表与费用上限；仅显示 token 估算。
+- 断点续跑与逐章重试/跳过按钮。
+- 阅读页/卷目录的快捷生成入口（当前只在 AI 分析视图内操作）。
+- 请求日志、token 实际用量统计与多模型对比。

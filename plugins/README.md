@@ -5,7 +5,7 @@ Novel-Disassembly 的导出插件放在这里。插件可以规范化导出词�
 - 完整接口：`plugins/API.md`
 - 插件化拆分路线与词条/v2 设计：`plugins/ARCHITECTURE.md`
 - 插件页：index.html → 侧栏“插件”
-- 默认不启用任何插件，默认导出结果与以前一致
+- 默认不启用导出类插件，默认导出结果与以前一致；`ai-analysis` 默认启用但空闲，未配置模型前不发起请求
 - 插件是本地经典脚本，兼容 `file://` 双击打开；无依赖、无构建、不能联网安装
 - 全局入口为 `window.ND`；`window.RP = window.ND` 是永久别名，旧插件用 `RP.plugins.register` 仍可工作
 
@@ -19,7 +19,8 @@ plugins/
 ├─ index.js                  # 由生成脚本创建，勿手工修改
 ├─ schema/plugin.schema.json
 ├─ _template/                # 复制这个目录开始写插件（生成脚本会跳过）
-└─ clean-annotations/        # 示例：去除标题末尾的更新标注，默认停用
+├─ clean-annotations/        # 示例：去除标题末尾的更新标注，默认停用
+└─ ai-analysis/              # 官方：OpenAI 兼容摘要与实体抽取，默认启用
 ```
 
 ## 快速上手

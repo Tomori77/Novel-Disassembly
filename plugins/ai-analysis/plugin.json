@@ -1,0 +1,12 @@
+{
+  "id": "ai-analysis",
+  "name": "AI 分析",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "enabled": true,
+  "priority": 50,
+  "description": "通过 OpenAI 兼容接口手动生成章节/卷/全书摘要，抽取人物、事件与伏笔，结果按书保存在本地插件存储。",
+  "author": "Novel-Disassembly",
+  "hooks": []
+}

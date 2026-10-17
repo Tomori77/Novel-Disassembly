@@ -441,7 +441,11 @@ plugins/
 │  ├─ plugin.json
 │  ├─ index.js
 │  └─ README.md
-└─ clean-annotations/
+├─ clean-annotations/
+│  ├─ plugin.json
+│  ├─ index.js
+│  └─ README.md
+└─ ai-analysis/               # 官方：OpenAI 兼容摘要与实体抽取
    ├─ plugin.json
    ├─ index.js
    └─ README.md
