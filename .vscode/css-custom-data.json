@@ -1,0 +1,13 @@
+{
+  "version": 1.1,
+  "properties": [
+    {
+      "name": "backdrop-filter",
+      "description": "对元素背后的区域应用模糊、亮度、对比度、饱和度等图形效果。"
+    },
+    {
+      "name": "-webkit-backdrop-filter",
+      "description": "backdrop-filter 的 WebKit 前缀写法，用于 Safari 等浏览器。"
+    }
+  ]
+}
