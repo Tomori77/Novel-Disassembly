@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RP Disassembly · 分卷拆解器</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mark" aria-hidden="true"></div>
+          <div>
+            <strong>RP Disassembly</strong>
+            <small>分卷拆解器</small>
+          </div>
+        </div>
+        <div class="toolbar">
+          <input id="fileInput" class="hidden" type="file" accept=".txt,.zip,text/plain,application/zip" />
+          <input id="folderInput" class="hidden" type="file" webkitdirectory directory multiple />
+          <button id="importButton">导入 TXT / ZIP</button>
+          <button id="importFolderButton">导入文件夹</button>
+          <button id="splitButton" class="primary">重新切分</button>
+          <button id="exportTxtButton">导出 TXT</button>
+        </div>
+      </header>
+
+      <main class="layout">
+        <aside class="sidebar">
+          <div class="sidebar-title">工作流程</div>
+          <nav class="nav">
+            <button class="active" data-view="source">素材与切分</button>
+            <button data-view="clean">清洗</button>
+            <button data-view="toc">卷目录</button>
+            <button data-view="reader">阅读</button>
+            <button data-view="export">导出</button>
+            <button data-view="plugins">插件</button>
+          </nav>
+          <div class="sidebar-summary" id="sidebarSummary">未导入文件</div>
+          <div class="sidebar-save" id="saveStatus">保存状态：检查中</div>
+        </aside>
+
+        <section class="content">
+          <section class="view active" data-view="source">
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h1>素材与切分</h1>
+                  <p>导入 TXT、导出的 ZIP 或文件夹，按“卷 → 节”两级结构切分；独立成段的通知、请假、求票会被单独识别。</p>
+                </div>
+                <div class="actions">
+                  <button id="defaultRulesButton">恢复默认规则</button>
+                </div>
+              </div>
+
+              <div class="source-grid">
+                <div class="stack">
+                  <label class="field">
+                    <span>卷标题正则</span>
+                    <input id="volumePatternInput" class="code-input" />
+                  </label>
+                  <label class="field">
+                    <span>章节标题正则</span>
+                    <input id="chapterPatternInput" class="code-input" />
+                  </label>
+                  <label class="field">
+                    <span>附加清洗关键词（可选，逗号分隔）</span>
+                    <input id="extraKeywordsInput" placeholder="例如：番外,公告" />
+                  </label>
+                  <p class="hint">
+                    默认支持“第 X 卷 / 卷 X / Volume X”和“第 X 节 / 第 X 章 / 第 X 回 / Chapter X”。卷标题要求独占一行且不以句号感叹号结尾，避免把正文误判成卷。
+                  </p>
+                </div>
+
+                <label class="field">
+                  <span>原文预览</span>
+                  <textarea id="sourcePreview" readonly placeholder="导入 TXT 后显示原文开头"></textarea>
+                </label>
+              </div>
+
+              <div class="stats stats-4">
+                <div class="stat">
+                  <strong id="statChars">0</strong>
+                  <span>原文字数</span>
+                </div>
+                <div class="stat">
+                  <strong id="statVolumes">0</strong>
+                  <span>卷</span>
+                </div>
+                <div class="stat">
+                  <strong id="statChapters">0</strong>
+                  <span>章节</span>
+                </div>
+                <div class="stat">
+                  <strong id="statJunk">0</strong>
+                  <span>已排除</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2>书架</h2>
+                  <p>最近 20 本导入的书保存在本机浏览器（IndexedDB）。打开后恢复标题、排除状态与上次阅读位置，无需重新导入。</p>
+                </div>
+              </div>
+              <div class="shelf-list" id="shelfList"></div>
+              <div class="shelf-foot">
+                <span class="hint" id="shelfStorage">存储占用：—</span>
+                <button id="shelfClearButton" class="danger">清空书架</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" data-view="clean">
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2>清洗</h2>
+                  <p>通知、请假、感言与疑似重复章节会列在这里。排除只影响导出，不改原文。</p>
+                </div>
+                <div class="actions">
+                  <button id="excludeSuspectsButton">排除全部疑似</button>
+                  <button id="restoreAllButton">恢复全部</button>
+                  <button id="reclassifyButton">重新检测</button>
+                </div>
+              </div>
+              <div class="clean-summary" id="cleanSummary"></div>
+              <div class="clean-list" id="cleanList"></div>
+            </div>
+          </section>
+
+          <section class="view" data-view="toc">
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2>卷目录</h2>
+                  <p>按卷折叠；点击章节进入阅读，灰色为已排除。</p>
+                </div>
+                <div class="actions">
+                  <input id="tocFilter" class="filter-input" placeholder="筛选标题…" />
+                  <button id="tocExpandAll">展开全部</button>
+                  <button id="tocCollapseAll">折叠全部</button>
+                </div>
+              </div>
+              <div id="tocList" class="toc-list"></div>
+            </div>
+          </section>
+
+          <section class="view" data-view="reader">
+            <div class="panel">
+              <div class="reader-head">
+                <div>
+                  <h2 id="readerTitle">未选择章节</h2>
+                  <p id="readerMeta">从卷目录选择章节。</p>
+                </div>
+                <div class="actions">
+                  <button id="prevChapterButton">上一章</button>
+                  <button id="nextChapterButton">下一章</button>
+                  <button id="toggleExcludeButton">排除本章</button>
+                  <button id="exportChapterButton">导出本章</button>
+                </div>
+              </div>
+
+              <label class="field">
+                <span>章节标题（可编辑）</span>
+                <input id="chapterTitleInput" />
+              </label>
+              <div class="actions" style="margin-top: 10px">
+                <button id="saveTitleButton" class="primary">保存标题</button>
+              </div>
+              <div id="readerBody" class="reader" style="margin-top: 12px"></div>
+            </div>
+          </section>
+
+          <section class="view" data-view="export">
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2>导出</h2>
+                  <p>保留原始卷 / 节编号；默认跳过已排除的通知与请假段落。</p>
+                </div>
+              </div>
+
+              <div class="export-options">
+                <label class="option"><input id="optIncludeExcluded" type="checkbox" /> 包含已排除章节</label>
+                <label class="option"><input id="optIncludeNotes" type="checkbox" checked /> 包含卷首语 / 前言</label>
+                <label class="option"><input id="optUseEditedTitles" type="checkbox" checked /> 使用编辑后的标题</label>
+                <label class="option"><input id="optCleanWatermark" type="checkbox" checked /> 清除盗版 / 网址水印行</label>
+                <label class="option"><input id="optCleanTrailingNotes" type="checkbox" checked /> 清除章末作者附言</label>
+              </div>
+
+              <p class="hint export-target-hint" id="exportTargetHint">正在检测导出目标…</p>
+
+              <div class="export-grid">
+                <div class="export-card">
+                  <h3>TXT</h3>
+                  <p>单文件，保留卷标题与原始章节名。</p>
+                  <button id="exportTxtButton2" class="primary">导出 TXT</button>
+                </div>
+                <div class="export-card">
+                  <h3>ZIP</h3>
+                  <p>按卷分文件夹，每章一个 txt，附目录、剔除清单与 manifest；解压得到同名根文件夹。</p>
+                  <button id="exportZipButton" class="primary">导出 ZIP</button>
+                </div>
+                <div class="export-card">
+                  <h3>EPUB</h3>
+                  <p>带卷目录的电子书，可直接阅读。</p>
+                  <button id="exportEpubButton" class="primary">导出 EPUB</button>
+                </div>
+                <div class="export-card">
+                  <h3>项目目录</h3>
+                  <p>默认写入项目根的 export/&lt;书名&gt;/。HTTP 服务模式直接落盘；file:// 首次需选择项目根目录。</p>
+                  <button id="exportFolderButton" class="primary" disabled>保存到项目目录</button>
+                </div>
+              </div>
+
+              <p class="hint" id="exportSummary">尚未导入文件。</p>
+              <p class="hint">ZIP 与文件夹导出都包含 _manifest.json，重新导入时可精确还原标题、编号与排除状态。</p>
+            </div>
+          </section>
+
+          <section class="view" data-view="plugins">
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2>插件</h2>
+                  <p>插件在导出时规范化词条（标题、正文、编号、类型），并可提供专用变量；导出路径、文件名与内容头由模板生成。默认不启用任何插件。</p>
+                </div>
+                <div class="actions">
+                  <button id="pluginRefreshButton">刷新插件</button>
+                </div>
+              </div>
+
+              <div class="plugin-status" id="pluginStatus">正在检查插件清单…</div>
+              <div id="pluginList" class="plugin-list"></div>
+
+              <div class="plugin-section">
+                <h3>导出模板</h3>
+                <p class="hint">模板使用 {{变量}} 语法；保存后立即影响 TXT / ZIP / 文件夹 / EPUB 与单章导出。路径展开后会按 / 分段安全化，拒绝 ..、绝对路径与 Windows 非法字符。</p>
+                <div class="template-grid">
+                  <label class="field">
+                    <span>卷目录</span>
+                    <input id="tplVolumeFolder" class="code-input" spellcheck="false" />
+                  </label>
+                  <label class="field">
+                    <span>章节文件名</span>
+                    <input id="tplChapterFile" class="code-input" spellcheck="false" />
+                  </label>
+                  <label class="field">
+                    <span>内容头</span>
+                    <input id="tplHeader" class="code-input" spellcheck="false" />
+                  </label>
+                </div>
+                <div class="actions">
+                  <button id="templateSaveButton" class="primary">保存模板</button>
+                  <button id="templateResetButton">恢复默认</button>
+                </div>
+                <p class="hint template-preview" id="templatePreview">导入素材后显示第一个内容章节的路径预览。</p>
+              </div>
+
+              <div class="plugin-section">
+                <h3>变量说明</h3>
+                <div class="table-wrap">
+                  <table class="var-table">
+                    <thead>
+                      <tr><th>变量</th><th>说明</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr><td><code>book</code></td><td>书名（去掉 .txt 后缀）</td></tr>
+                      <tr><td><code>bookSafe</code></td><td>安全化后的书名，可安全用作目录名</td></tr>
+                      <tr><td><code>volume</code></td><td>卷原始标题，如“第一卷 ：魔性不改”</td></tr>
+                      <tr><td><code>volumeNo</code></td><td>卷号补零两位；synthetic 卷为 00</td></tr>
+                      <tr><td><code>volumeSafe</code></td><td>卷名安全化；synthetic 卷为“序章”</td></tr>
+                      <tr><td><code>volumeTitle</code></td><td>卷名（优先 name，否则原始标题）</td></tr>
+                      <tr><td><code>chapterNo</code></td><td>全书编号补零四位，无编号为 0000</td></tr>
+                      <tr><td><code>localNo</code></td><td>卷内编号补零四位，无编号为 0000</td></tr>
+                      <tr><td><code>title</code></td><td>当前词条标题（已应用清洗与插件规范化）</td></tr>
+                      <tr><td><code>titleSafe</code></td><td>安全化后的标题，可安全用作文件名</td></tr>
+                      <tr><td><code>rawTitle</code></td><td>原始标题</td></tr>
+                      <tr><td><code>type</code></td><td>词条类型：chapter / preface / volumeNote / notice</td></tr>
+                      <tr><td><code>date</code></td><td>导出日期 YYYY-MM-DD</td></tr>
+                      <tr><td><code>ext</code></td><td>章节正文扩展名，固定为 txt</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p class="hint">插件 defineVariables 返回的变量以 <code>{{plugin.&lt;id&gt;.&lt;name&gt;}}</code> 暴露，没有命名冲突时也可直接用 <code>{{name}}</code>。</p>
+              </div>
+
+              <div class="plugin-section">
+                <h3>安装与安全</h3>
+                <p class="hint">插件只能从本地 <code>plugins/</code> 文件夹安装，无法联网获取。新增或修改插件后运行 <code>powershell -File tools/build-plugins.ps1</code> 重新生成 <code>plugins/index.js</code>，再点“刷新插件”。</p>
+                <p class="plugin-warning">插件是本地 JavaScript，运行在页面权限内，能够读取导入的文本并修改导出内容。只启用你信任的插件。</p>
+              </div>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script src="js/util.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/zip.js"></script>
+    <script src="js/junk.js"></script>
+    <script src="js/parser.js"></script>
+    <script src="js/plugins.js"></script>
+    <script src="js/importer.js"></script>
+    <script src="js/exporter.js"></script>
+    <script src="js/export-target.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>

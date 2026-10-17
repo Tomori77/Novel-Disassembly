@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rp-disassembly.local/schema/plugin.schema.json",
+  "title": "RP Disassembly plugin manifest",
+  "description": "plugins/<id>/plugin.json",
+  "type": "object",
+  "required": ["id", "name", "version", "apiVersion", "entry"],
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "插件唯一标识，只能使用小写字母、数字和连字符。"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "显示名称。"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "插件版本，建议语义化版本，如 0.1.0。"
+    },
+    "apiVersion": {
+      "const": 1,
+      "description": "插件 API 版本。当前只支持 1。"
+    },
+    "entry": {
+      "type": "string",
+      "minLength": 1,
+      "description": "相对插件目录的入口脚本，如 index.js。",
+      "allOf": [
+        {
+          "not": {
+            "pattern": "^(?:[A-Za-z]:|[\\\\/])"
+          }
+        },
+        {
+          "not": {
+            "pattern": "(^|[\\\\/])\\.\\.([\\\\/]|$)"
+          }
+        }
+      ]
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "manifest 默认是否启用。localStorage 中的显式开关优先。"
+    },
+    "priority": {
+      "type": "integer",
+      "default": 100,
+      "description": "normalizeEntry 执行顺序，数值小的先执行。"
+    },
+    "description": {
+      "type": "string",
+      "default": "",
+      "description": "插件页展示的说明。"
+    },
+    "author": {
+      "type": "string",
+      "description": "作者信息，仅用于展示。"
+    },
+    "hooks": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["normalizeEntry", "defineVariables", "beforeExport", "exporters", "afterImport"]
+      },
+      "description": "仅用于展示的钩子列表，实际钩子以 index.js 注册为准。"
+    }
+  }
+}

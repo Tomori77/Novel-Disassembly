@@ -1,0 +1,850 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RP Disassembly · 章节切分器</title>
+    <style>
+      :root {
+        --bg: #f5f5f7;
+        --surface: rgba(255, 255, 255, 0.88);
+        --surface-strong: #ffffff;
+        --text: #1d1d1f;
+        --muted: #6e6e73;
+        --line: rgba(21, 35, 45, 0.1);
+        --accent: #155e75;
+        --accent-dark: #164e63;
+        --accent-soft: #e5f5f8;
+        --danger: #b42318;
+        --shadow: 0 18px 55px rgba(15, 23, 42, 0.08);
+        --radius: 16px;
+        --radius-small: 10px;
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        color: var(--text);
+        font-family: var(--sans);
+        background:
+          radial-gradient(circle at 10% -10%, rgba(21, 94, 117, 0.16), transparent 32%),
+          radial-gradient(circle at 92% 2%, rgba(15, 118, 110, 0.12), transparent 28%),
+          linear-gradient(180deg, #fbfbfd 0%, var(--bg) 46%, #eef3f4 100%);
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        padding: 9px 14px;
+        border: 0;
+        border-radius: 999px;
+        color: var(--text);
+        background: #ececef;
+        cursor: pointer;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+      }
+
+      button:hover {
+        background: #e2e2e7;
+      }
+
+      button.primary {
+        color: #ffffff;
+        background: linear-gradient(135deg, var(--accent-dark), var(--accent));
+        box-shadow: 0 10px 24px rgba(21, 94, 117, 0.22);
+      }
+
+      button.danger {
+        color: var(--danger);
+        background: #fee4e2;
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      input,
+      textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-small);
+        outline: none;
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.94);
+      }
+
+      input:focus,
+      textarea:focus {
+        border-color: rgba(21, 94, 117, 0.45);
+        box-shadow: 0 0 0 4px rgba(21, 94, 117, 0.09);
+      }
+
+      textarea {
+        min-height: 160px;
+        resize: vertical;
+        line-height: 1.6;
+      }
+
+      .app {
+        min-height: 100vh;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 14px 24px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.8);
+        background: rgba(250, 250, 252, 0.8);
+        backdrop-filter: blur(22px) saturate(140%);
+        box-shadow: 0 1px 0 rgba(21, 35, 45, 0.06), 0 18px 40px rgba(15, 23, 42, 0.05);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .mark {
+        position: relative;
+        width: 36px;
+        height: 36px;
+        border-radius: 13px;
+        background: linear-gradient(145deg, var(--accent-dark), #0f766e);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 12px 26px rgba(21, 94, 117, 0.28);
+      }
+
+      .mark::before {
+        position: absolute;
+        top: 9px;
+        left: 10px;
+        width: 13px;
+        height: 18px;
+        border: 2px solid rgba(255, 255, 255, 0.9);
+        border-left: 0;
+        border-radius: 2px 8px 8px 2px;
+        content: "";
+      }
+
+      .brand strong {
+        display: block;
+        font-size: 15px;
+      }
+
+      .brand small {
+        display: block;
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-left: auto;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 220px minmax(0, 1fr);
+        gap: 18px;
+        max-width: 1500px;
+        margin: 0 auto;
+        padding: 18px 24px 28px;
+      }
+
+      .sidebar,
+      .panel {
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        border-radius: var(--radius);
+        background: var(--surface);
+        box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.68);
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 82px;
+        align-self: start;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.66);
+        backdrop-filter: blur(18px) saturate(130%);
+      }
+
+      .sidebar-title {
+        padding: 10px 12px 12px;
+        color: var(--muted);
+        font-size: 12px;
+        letter-spacing: 0.04em;
+      }
+
+      .nav {
+        display: grid;
+        gap: 6px;
+      }
+
+      .nav button {
+        position: relative;
+        width: 100%;
+        border-radius: 12px;
+        text-align: left;
+        background: transparent;
+        box-shadow: none;
+      }
+
+      .nav button.active {
+        color: var(--accent);
+        background: var(--surface-strong);
+        box-shadow: 0 8px 25px rgba(15, 23, 42, 0.06);
+      }
+
+      .nav button.active::before {
+        position: absolute;
+        top: 9px;
+        bottom: 9px;
+        left: 0;
+        width: 3px;
+        border-radius: 999px;
+        background: var(--accent);
+        content: "";
+      }
+
+      .content {
+        display: grid;
+        gap: 16px;
+        min-width: 0;
+      }
+
+      .view {
+        display: none;
+      }
+
+      .view.active {
+        display: grid;
+        gap: 16px;
+      }
+
+      .panel {
+        padding: 20px;
+      }
+
+      .panel-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .panel-head h1,
+      .panel-head h2 {
+        margin: 0;
+        line-height: 1.2;
+      }
+
+      .panel-head h1 {
+        font-size: 28px;
+      }
+
+      .panel-head h2 {
+        font-size: 20px;
+      }
+
+      .panel-head p {
+        max-width: 760px;
+        margin: 8px 0 0;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .stat {
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-small);
+        background: rgba(255, 255, 255, 0.65);
+      }
+
+      .stat strong {
+        display: block;
+        font-size: 22px;
+      }
+
+      .stat span {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .field {
+        display: grid;
+        gap: 8px;
+      }
+
+      .field span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .source-grid,
+      .chapter-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(320px, 0.8fr);
+        gap: 16px;
+      }
+
+      .chapter-layout {
+        grid-template-columns: minmax(220px, 0.45fr) minmax(0, 1.2fr);
+      }
+
+      .chapter-list {
+        display: grid;
+        gap: 8px;
+        max-height: 68vh;
+        overflow: auto;
+        padding-right: 4px;
+      }
+
+      .chapter-item {
+        display: grid;
+        gap: 5px;
+        padding: 11px 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.65);
+        cursor: pointer;
+      }
+
+      .chapter-item:hover,
+      .chapter-item.active {
+        border-color: rgba(21, 94, 117, 0.35);
+        background: #ffffff;
+        box-shadow: 0 8px 22px rgba(21, 94, 117, 0.07);
+      }
+
+      .chapter-title {
+        overflow: hidden;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .chapter-meta {
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .reader {
+        min-height: 430px;
+        max-height: 68vh;
+        overflow: auto;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-small);
+        color: #2f3135;
+        background: var(--surface-strong);
+        line-height: 1.85;
+        white-space: pre-wrap;
+      }
+
+      .code-input {
+        font-family: var(--mono);
+      }
+
+      .hint {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .empty {
+        padding: 24px 12px;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .toast {
+        position: fixed;
+        right: 20px;
+        bottom: 20px;
+        z-index: 20;
+        display: none;
+        max-width: min(520px, calc(100vw - 40px));
+        padding: 12px 14px;
+        border-radius: 12px;
+        color: #ffffff;
+        background: rgba(29, 29, 31, 0.92);
+        box-shadow: var(--shadow);
+      }
+
+      .toast.show {
+        display: block;
+      }
+
+      @media (max-width: 980px) {
+        .layout {
+          grid-template-columns: 1fr;
+          padding: 12px;
+        }
+
+        .sidebar {
+          position: static;
+        }
+
+        .nav {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .source-grid,
+        .chapter-layout,
+        .stats {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar {
+          align-items: flex-start;
+          flex-direction: column;
+          padding: 12px;
+        }
+
+        .toolbar {
+          width: 100%;
+          margin-left: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mark" aria-hidden="true"></div>
+          <div>
+            <strong>RP Disassembly</strong>
+            <small>小说章节切分器</small>
+          </div>
+        </div>
+        <div class="toolbar">
+          <input id="fileInput" class="hidden" type="file" accept=".txt,text/plain" />
+          <button id="importButton">导入 TXT</button>
+          <button id="exportAllButton" class="primary">导出全部章节</button>
+          <button id="exportChapterButton">导出当前章节</button>
+        </div>
+      </header>
+
+      <main class="layout">
+        <aside class="sidebar">
+          <div class="sidebar-title">工作流程</div>
+          <nav class="nav">
+            <button class="active" data-view="source">素材与切分</button>
+            <button data-view="chapters">章节浏览</button>
+          </nav>
+        </aside>
+
+        <section class="content">
+          <section class="view active" data-view="source">
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h1>素材与切分</h1>
+                  <p>导入 TXT，设置章节标题识别规则，切分后可分别编辑章节标题并导出为独立 TXT 文件。</p>
+                </div>
+                <div class="actions">
+                  <button id="splitButton" class="primary">重新切分</button>
+                  <button id="defaultPatternButton">恢复默认规则</button>
+                </div>
+              </div>
+
+              <div class="source-grid">
+                <div>
+                  <label class="field">
+                    <span>章节标题识别正则</span>
+                    <input id="patternInput" class="code-input" />
+                  </label>
+                  <p class="hint">
+                    默认支持“第 X 章 / 第 X 节 / 第 X 回 / 卷 X / Chapter X”。每个匹配行会作为新章节的起点。
+                  </p>
+
+                  <div class="stats">
+                    <div class="stat">
+                      <strong id="charCount">0</strong>
+                      <span>原文字数</span>
+                    </div>
+                    <div class="stat">
+                      <strong id="chapterCount">0</strong>
+                      <span>章节数量</span>
+                    </div>
+                    <div class="stat">
+                      <strong id="currentFile">未导入</strong>
+                      <span>当前文件</span>
+                    </div>
+                  </div>
+                </div>
+
+                <label class="field">
+                  <span>原文预览</span>
+                  <textarea id="sourcePreview" readonly placeholder="导入 TXT 后显示原文开头"></textarea>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" data-view="chapters">
+            <div class="chapter-layout">
+              <div class="panel">
+                <div class="panel-head">
+                  <div>
+                    <h2>章节列表</h2>
+                    <p>共 <span id="chapterListCount">0</span> 章</p>
+                  </div>
+                </div>
+                <div id="chapterList" class="chapter-list"></div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-head">
+                  <div>
+                    <h2 id="selectedChapterTitle">未选择章节</h2>
+                    <p id="selectedChapterMeta">导入并切分后选择章节。</p>
+                  </div>
+                  <button id="saveChapterButton">保存标题</button>
+                </div>
+
+                <label class="field">
+                  <span>章节标题</span>
+                  <input id="chapterTitleInput" />
+                </label>
+                <div id="chapterReader" class="reader" style="margin-top: 12px"></div>
+              </div>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+      (() => {
+        "use strict";
+
+        const DEFAULT_PATTERN =
+          "^\\s*(?:第[零一二三四五六七八九十百千万两0-9]+[章节回]|卷[零一二三四五六七八九十百千万两0-9]+|Chapter\\s+\\d+|CHAPTER\\s+\\d+)[:：\\s].*$";
+
+        const state = {
+          fileName: "",
+          rawText: "",
+          pattern: DEFAULT_PATTERN,
+          chapters: [],
+          selectedChapterId: "",
+        };
+
+        const $ = (id) => document.getElementById(id);
+
+        function showToast(message) {
+          const toast = $("toast");
+          toast.textContent = message;
+          toast.classList.add("show");
+          clearTimeout(showToast.timer);
+          showToast.timer = setTimeout(() => toast.classList.remove("show"), 2600);
+        }
+
+        function downloadFile(fileName, content) {
+          const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement("a");
+          anchor.href = url;
+          anchor.download = fileName;
+          anchor.click();
+          URL.revokeObjectURL(url);
+        }
+
+        function switchView(viewName) {
+          document.querySelectorAll(".view").forEach((view) => {
+            view.classList.toggle("active", view.dataset.view === viewName);
+          });
+          document.querySelectorAll(".nav button").forEach((button) => {
+            button.classList.toggle("active", button.dataset.view === viewName);
+          });
+        }
+
+        function normalizeText(text) {
+          return String(text || "")
+            .replace(/\uFEFF/g, "")
+            .replace(/\r\n/g, "\n")
+            .replace(/\r/g, "\n");
+        }
+
+        function splitChapters() {
+          state.pattern = $("patternInput").value.trim() || DEFAULT_PATTERN;
+
+          if (!state.rawText) {
+            state.chapters = [];
+            state.selectedChapterId = "";
+            renderAll();
+            showToast("请先导入 TXT 文件");
+            return;
+          }
+
+          let matcher;
+          try {
+            matcher = new RegExp(state.pattern, "gim");
+          } catch (error) {
+            showToast("章节正则无效：" + error.message);
+            return;
+          }
+
+          const matches = Array.from(state.rawText.matchAll(matcher)).map((match) => ({
+            title: match[0].trim(),
+            offset: match.index,
+          }));
+
+          if (matches.length === 0) {
+            state.chapters = [
+              {
+                id: "C0001",
+                index: 1,
+                title: "全文",
+                text: state.rawText.trim(),
+                startOffset: 0,
+                endOffset: state.rawText.length,
+              },
+            ];
+          } else {
+            const firstContent = state.rawText.slice(0, matches[0].offset).trim();
+            if (firstContent) {
+              matches.unshift({ title: "序章 / 前言", offset: 0 });
+            }
+
+            state.chapters = matches.map((match, index) => {
+              const endOffset = matches[index + 1]?.offset ?? state.rawText.length;
+              return {
+                id: "C" + String(index + 1).padStart(4, "0"),
+                index: index + 1,
+                title: match.title,
+                text: state.rawText.slice(match.offset, endOffset).trim(),
+                startOffset: match.offset,
+                endOffset,
+              };
+            });
+          }
+
+          state.selectedChapterId = state.chapters[0]?.id || "";
+          renderAll();
+          showToast("已切分为 " + state.chapters.length + " 章");
+        }
+
+        function selectedChapter() {
+          return state.chapters.find((chapter) => chapter.id === state.selectedChapterId);
+        }
+
+        function renderSource() {
+          $("patternInput").value = state.pattern;
+          $("sourcePreview").value = state.rawText.slice(0, 4000);
+          $("charCount").textContent = state.rawText.length.toLocaleString();
+          $("chapterCount").textContent = state.chapters.length.toLocaleString();
+          $("currentFile").textContent = state.fileName || "未导入";
+        }
+
+        function renderChapterList() {
+          $("chapterListCount").textContent = state.chapters.length.toLocaleString();
+
+          if (!state.chapters.length) {
+            $("chapterList").innerHTML = '<div class="empty">暂无章节</div>';
+            return;
+          }
+
+          $("chapterList").innerHTML = state.chapters
+            .map(
+              (chapter) => `
+                <div class="chapter-item ${chapter.id === state.selectedChapterId ? "active" : ""}" data-id="${chapter.id}">
+                  <div class="chapter-title">${escapeHtml(chapter.title)}</div>
+                  <div class="chapter-meta">${chapter.id} · ${chapter.text.length.toLocaleString()} 字</div>
+                </div>
+              `,
+            )
+            .join("");
+
+          document.querySelectorAll(".chapter-item").forEach((item) => {
+            item.onclick = () => {
+              state.selectedChapterId = item.dataset.id;
+              renderChapterList();
+              renderSelectedChapter();
+            };
+          });
+        }
+
+        function renderSelectedChapter() {
+          const chapter = selectedChapter();
+          $("selectedChapterTitle").textContent = chapter?.title || "未选择章节";
+          $("selectedChapterMeta").textContent = chapter
+            ? `${chapter.id} · ${chapter.text.length.toLocaleString()} 字`
+            : "导入并切分后选择章节。";
+          $("chapterTitleInput").value = chapter?.title || "";
+          $("chapterReader").textContent = chapter?.text || "";
+        }
+
+        function renderAll() {
+          renderSource();
+          renderChapterList();
+          renderSelectedChapter();
+        }
+
+        function saveChapterTitle() {
+          const chapter = selectedChapter();
+          if (!chapter) {
+            showToast("请先选择章节");
+            return;
+          }
+
+          chapter.title = $("chapterTitleInput").value.trim() || chapter.title;
+          renderAll();
+          showToast("章节标题已保存");
+        }
+
+        function importTextFile(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+
+          const reader = new FileReader();
+          reader.onload = () => {
+            state.fileName = file.name;
+            state.rawText = normalizeText(reader.result);
+            splitChapters();
+          };
+          reader.onerror = () => showToast("文件读取失败");
+          reader.readAsText(file, "utf-8");
+          event.target.value = "";
+        }
+
+        function exportAllChapters() {
+          if (!state.chapters.length) {
+            showToast("暂无可导出的章节");
+            return;
+          }
+
+          const content = state.chapters
+            .map((chapter, index) => {
+              const title = normalizeExportTitle(chapter.title);
+              const body = removeLeadingChapterTitle(chapter.text, chapter.title);
+              return `第 ${index + 1} 章${title ? " " + title : ""}\n\n${body}`;
+            })
+            .join("\n\n---------------------------\n\n");
+          const baseName = state.fileName.replace(/\.txt$/i, "") || "novel";
+          downloadFile(`${baseName}_分章.txt`, content);
+          showToast("已导出分章 TXT");
+        }
+
+        function exportCurrentChapter() {
+          const chapter = selectedChapter();
+          if (!chapter) {
+            showToast("请先选择章节");
+            return;
+          }
+
+          const baseName = state.fileName.replace(/\.txt$/i, "") || "novel";
+          const title = normalizeExportTitle(chapter.title);
+          const safeTitle = (title || "第" + chapter.index + "章").replace(/[\\/:*?"<>|]/g, "_").slice(0, 80);
+          const body = removeLeadingChapterTitle(chapter.text, chapter.title);
+          const content = `第 ${chapter.index} 章${title ? " " + title : ""}\n\n${body}`;
+          downloadFile(`${String(chapter.index).padStart(4, "0")}_${safeTitle}.txt`, content);
+        }
+
+        function normalizeExportTitle(title) {
+          return String(title || "")
+            .trim()
+            .replace(/^第\s*[零一二三四五六七八九十百千万两0-9]+\s*[章节回]\s*/i, "")
+            .replace(/^卷\s*[零一二三四五六七八九十百千万两0-9]+\s*/i, "")
+            .replace(/^chapter\s+\d+\s*/i, "")
+            .trim();
+        }
+
+        function removeLeadingChapterTitle(text, title) {
+          const lines = normalizeText(text).trim().split("\n");
+          if (!lines.length) return "";
+
+          const firstLine = lines[0].trim();
+          const normalizedTitle = String(title || "")
+            .replace(/^第\s*[零一二三四五六七八九十百千万两0-9]+\s*[章节回]\s*/i, "")
+            .trim();
+          const looksLikeChapterLine = /^第\s*[零一二三四五六七八九十百千万两0-9]+\s*[章节回]/i.test(firstLine)
+            || /^卷\s*[零一二三四五六七八九十百千万两0-9]+/i.test(firstLine)
+            || /^chapter\s+\d+/i.test(firstLine);
+          const sameAsTitle = normalizedTitle && firstLine.includes(normalizedTitle);
+
+          return (looksLikeChapterLine || sameAsTitle ? lines.slice(1) : lines)
+            .join("\n")
+            .trim();
+        }
+
+        function escapeHtml(value) {
+          return String(value ?? "").replace(/[&<>\"]/g, (character) => ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+          })[character]);
+        }
+
+        function bindEvents() {
+          $("importButton").onclick = () => $("fileInput").click();
+          $("fileInput").onchange = importTextFile;
+          $("splitButton").onclick = splitChapters;
+          $("defaultPatternButton").onclick = () => {
+            $("patternInput").value = DEFAULT_PATTERN;
+            state.pattern = DEFAULT_PATTERN;
+            showToast("已恢复默认规则");
+          };
+          $("saveChapterButton").onclick = saveChapterTitle;
+          $("exportAllButton").onclick = exportAllChapters;
+          $("exportChapterButton").onclick = exportCurrentChapter;
+          document.querySelectorAll(".nav button").forEach((button) => {
+            button.onclick = () => switchView(button.dataset.view);
+          });
+        }
+
+        $("patternInput").value = DEFAULT_PATTERN;
+        bindEvents();
+        renderAll();
+      })();
+    </script>
+  </body>
+</html>

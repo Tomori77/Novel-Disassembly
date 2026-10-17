@@ -1,0 +1,23 @@
+# 本地素材（受版权保护 / 体积大，不纳入仓库）
+docs/*.txt
+docs/*.epub
+docs/*.pdf
+docs/*.mobi
+docs/*.azw3
+
+# 导出产物
+export/
+*.zip
+*.epub
+
+# 测试与临时文件
+_smoke.html
+_idb_test.html
+*.log
+*.tmp
+*.bak
+
+# 系统文件
+Thumbs.db
+.DS_Store
+desktop.ini

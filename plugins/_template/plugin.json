@@ -1,0 +1,12 @@
+{
+  "id": "my-plugin",
+  "name": "我的插件",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "enabled": false,
+  "priority": 100,
+  "description": "复制 _template 后修改这里：说明插件做什么。",
+  "author": "",
+  "hooks": ["normalizeEntry"]
+}
