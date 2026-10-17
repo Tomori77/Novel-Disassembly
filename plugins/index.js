@@ -1,5 +1,5 @@
 // 由 tools/build-plugins.ps1 自动生成，请勿手工修改。
-window.RP_PLUGIN_INDEX = [
+window.ND_PLUGIN_INDEX = [
     {
         "id":  "clean-annotations",
         "name":  "去除更新标注",

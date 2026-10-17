@@ -55,15 +55,17 @@
 核心不再新增具体格式或清洗规则。目标 API：
 
 ```js
-RP.core.version            // 内核与词条 API 版本
-RP.core.book()             // 当前书（只读视图）
-RP.core.entries()          // 迭代词条（book / volume / chapter / notice）
-RP.core.variables(entry)   // 生成该词条的变量表
-RP.core.exportPlan(options)// 生成导出计划：词条、路径、模板、manifest
-RP.core.register(capability)
+ND.core.version            // 内核与词条 API 版本
+ND.core.book()             // 当前书（只读视图）
+ND.core.entries()          // 迭代词条（book / volume / chapter / notice）
+ND.core.variables(entry)   // 生成该词条的变量表
+ND.core.exportPlan(options)// 生成导出计划：词条、路径、模板、manifest
+ND.core.register(capability)
 ```
 
-`RP.core.exportPlan()` 是关键：导出插件只负责“把计划变成字节”，不再各自实现切分、命名和路径规则。
+`ND.core.exportPlan()` 是关键：导出插件只负责“把计划变成字节”，不再各自实现切分、命名和路径规则。
+
+> 命名空间：全局入口为 `window.ND`，`window.RP` 是永久兼容别名；下文的 `ND.core.*` 与旧文档中的 `RP.core.*` 指同一对象。manifest 契约版本为 `novel-disassembly/1`，导入仍接受旧的 `rp-disassembly/1`。
 
 ---
 
@@ -159,7 +161,7 @@ v1 已有 `normalizeEntry` / `defineVariables`。v2 增加能力声明，按类�
 ### 4.1 导出插件
 
 ```js
-RP.plugins.register({
+ND.plugins.register({
   id: "markdown-exporter",
   apiVersion: 2,
   provides: ["exporter.markdown"],
@@ -213,7 +215,7 @@ RP.plugins.register({
 ### 阶段 2：导出格式插件化（收益最高）
 
 - 把 TXT / ZIP / EPUB 改为内置 `exporter` 插件
-- 核心新增 `RP.core.exportPlan()`，统一词条选择、编号、路径、manifest
+- 核心新增 `ND.core.exportPlan()`，统一词条选择、编号、路径、manifest
 - 旧按钮改为读取“已启用导出插件列表”，新增格式只需加插件
 - 保持 ZIP 根目录、文件名、内容与 manifest 字段不变
 
@@ -266,7 +268,7 @@ RP.plugins.register({
 ## 8. 立刻可做的三件事
 
 1. **抽 `cleanExportBody` 为内置 normalizer 插件**：改动小、可对比、直接验证插件管线
-2. **新增 `RP.core.exportPlan()`**：为导出插件化打地基，先让 TXT/ZIP/EPUB 走同一计划
+2. **新增 `ND.core.exportPlan()`**：为导出插件化打地基，先让 TXT/ZIP/EPUB 走同一计划
 3. **补 golden 测试与 `provides` 变量目录**：后续每次拆分都有回归保护
 
 完成这三步后，再把三个导出格式迁成插件，本体就只剩“拆解 + 宿主 + I/O + 壳”，同时默认体验不变。

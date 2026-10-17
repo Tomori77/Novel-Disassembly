@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  const RP = window.RP;
+  const ND = window.ND;
 
   const NOTICE_HEAD =
     /^(?:请假(?:条|一天|两天|一周|几天)?(?:[，,。！!：:]|$)|今天无更|今日无更|明天无更|停更|断更|更新在?\s*[0-9一二三四五六七八九十]+\s*点|求月票|求推荐票|求订阅|为.{0,24}月票|(?:单章|通知|公告|说明|感言|上架感言|完本感言|卷末感言)\s*[:：]|上架感言|完本感言|卷末感言|新书预告)/;
@@ -96,8 +96,8 @@
       .trim();
   }
 
-  RP.splitBook = function (text, rules) {
-    const raw = RP.normalizeText(text);
+  ND.splitBook = function (text, rules) {
+    const raw = ND.normalizeText(text);
     const volumeRegex = buildRegex(rules.volumePattern, "gim");
     const chapterRegex = buildRegex(rules.chapterPattern, "gim");
     const volumeTest = buildRegex(rules.volumePattern, "im");
@@ -112,8 +112,8 @@
     for (const mark of volumeMarks) {
       const prev = dedupedVolumes[dedupedVolumes.length - 1];
       if (prev) {
-        const prevLabel = RP.parseVolumeLabel(prev.rawTitle);
-        const label = RP.parseVolumeLabel(mark.rawTitle);
+        const prevLabel = ND.parseVolumeLabel(prev.rawTitle);
+        const label = ND.parseVolumeLabel(mark.rawTitle);
         const sameNumber = prevLabel.number != null && prevLabel.number === label.number;
         const sameName = prevLabel.name && prevLabel.name === label.name;
         if ((sameNumber && sameName) || (sameNumber && !label.name)) {
@@ -136,10 +136,10 @@
     for (const mark of marks) {
       if (mark.kind === "volume") {
         if (current) current.endOffset = mark.offset;
-        const label = RP.parseVolumeLabel(mark.rawTitle);
+        const label = ND.parseVolumeLabel(mark.rawTitle);
         const number = label.number != null ? label.number : volumes.filter(function (v) { return !v.synthetic; }).length + 1;
         current = {
-          id: "V" + RP.pad(volumes.length + 1, 3),
+          id: "V" + ND.pad(volumes.length + 1, 3),
           index: volumes.length,
           synthetic: false,
           number: number,
@@ -154,7 +154,7 @@
       } else {
         if (!current) {
           current = {
-            id: "V" + RP.pad(volumes.length + 1, 3),
+            id: "V" + ND.pad(volumes.length + 1, 3),
             index: volumes.length,
             synthetic: true,
             number: null,
@@ -203,7 +203,7 @@
             : "全文"
           : (volume.name || volume.rawTitle) + " · 卷首语";
         const note = {
-          id: "C" + RP.pad(idCounter, 5),
+          id: "C" + ND.pad(idCounter, 5),
           type: volume.synthetic ? "preface" : "volumeNote",
           rawTitle: noteTitle,
           title: noteTitle,
@@ -224,10 +224,10 @@
         const endOffset = volume.marks[index + 1] ? volume.marks[index + 1].offset : volume.endOffset;
         const full = raw.slice(mark.offset, endOffset);
         const body = extractBody(full, mark.rawTitle, strayVolumeTitles);
-        const label = mark.kind === "chapter" ? RP.parseChapterLabel(mark.rawTitle) : { number: null, unit: "", name: "" };
+        const label = mark.kind === "chapter" ? ND.parseChapterLabel(mark.rawTitle) : { number: null, unit: "", name: "" };
         idCounter += 1;
         const chapter = {
-          id: "C" + RP.pad(idCounter, 5),
+          id: "C" + ND.pad(idCounter, 5),
           type: mark.kind === "notice" ? "notice" : "chapter",
           rawTitle: mark.rawTitle,
           title: mark.rawTitle,
@@ -298,7 +298,7 @@
     };
   };
 
-  RP.cleanExportBody = function (body, options) {
+  ND.cleanExportBody = function (body, options) {
     const opts = options || {};
     let lines = String(body || "").split("\n");
 

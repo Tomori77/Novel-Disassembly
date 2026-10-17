@@ -25,7 +25,7 @@
 ## 示例
 
 ```js
-RP.plugins.register({
+ND.plugins.register({
   id: "clean-annotations",
   apiVersion: 1,
   hooks: {

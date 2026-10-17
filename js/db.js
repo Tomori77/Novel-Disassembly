@@ -1,13 +1,15 @@
 (function () {
   "use strict";
 
-  const RP = window.RP;
-  if (!RP) return;
+  const ND = window.ND;
+  if (!ND) return;
 
-  const DB_NAME = "rp-disassembly";
+  const DB_NAME = "novel-disassembly";
+  const LEGACY_DB_NAME = "rp-disassembly";
   const DB_VERSION = 1;
   const STORES = ["books", "sources", "volumes", "chapters", "settings"];
   const SOURCE_TYPES = { txt: true, zip: true, folder: true };
+  const OPEN_TIMEOUT = 3000;
 
   const ERROR_HINTS = {
     QuotaExceededError: "浏览器存储空间不足",
@@ -22,6 +24,7 @@
   };
 
   let openPromise = null;
+  let legacyMode = false;
 
   function errorText(error) {
     if (!error) return "";
@@ -176,7 +179,7 @@
     }
   }
 
-  function openDatabase() {
+  function openNamedDatabase(name, version, onUpgrade) {
     return new Promise(function (resolve, reject) {
       try {
         requireSupport();
@@ -187,17 +190,46 @@
 
       let request;
       try {
-        request = window.indexedDB.open(DB_NAME, DB_VERSION);
+        request =
+          version == null
+            ? window.indexedDB.open(name)
+            : window.indexedDB.open(name, version);
       } catch (error) {
         reject(makeError("无法打开本地数据库", error));
         return;
       }
 
+      let settled = false;
+      const timer = setTimeout(function () {
+        if (settled) return;
+        settled = true;
+        try {
+          if (request.result) request.result.close();
+        } catch (error) {
+          /* 忽略关闭异常 */
+        }
+        reject(new Error("打开本地数据库超时（可能被其他页面占用）"));
+      }, OPEN_TIMEOUT);
+
+      function finish() {
+        clearTimeout(timer);
+      }
+
       request.onupgradeneeded = function () {
-        createSchema(request.result);
+        if (onUpgrade) onUpgrade(request.result);
       };
 
       request.onsuccess = function () {
+        if (settled) {
+          try {
+            request.result.close();
+          } catch (error) {
+            /* 已超时，忽略迟到的连接 */
+          }
+          return;
+        }
+        settled = true;
+        finish();
         const db = request.result;
         db.onversionchange = function () {
           try {
@@ -211,17 +243,292 @@
       };
 
       request.onerror = function () {
+        if (settled) return;
+        settled = true;
+        finish();
         reject(makeError("无法打开本地数据库", request.error));
       };
 
+      // onblocked 不立即失败：等待 OPEN_TIMEOUT 后由上面的定时器统一降级。
       request.onblocked = function () {
-        reject(new Error("本地数据库被其他页面占用，请关闭其他标签页后重试"));
+        /* 等待超时 */
       };
     });
   }
 
+  function hasLegacyDatabase() {
+    if (typeof window === "undefined" || !window.indexedDB) return Promise.resolve(false);
+    if (typeof window.indexedDB.databases === "function") {
+      return Promise.resolve()
+        .then(function () {
+          return window.indexedDB.databases();
+        })
+        .then(function (list) {
+          return (list || []).some(function (item) {
+            return item && item.name === LEGACY_DB_NAME;
+          });
+        })
+        .catch(function () {
+          return true;
+        });
+    }
+    // 没有 databases() 的浏览器只能尝试打开；后续按 objectStoreNames 判断。
+    return Promise.resolve(true);
+  }
+
+  function readStore(db, name) {
+    return new Promise(function (resolve, reject) {
+      let tx;
+      try {
+        tx = db.transaction([name], "readonly");
+      } catch (error) {
+        reject(makeError("读取旧数据库失败", error));
+        return;
+      }
+      const request = tx.objectStore(name).getAll();
+      request.onsuccess = function () {
+        resolve(request.result || []);
+      };
+      request.onerror = function () {
+        reject(makeError("读取旧数据库失败", request.error));
+      };
+    });
+  }
+
+  function countStore(db, name) {
+    return new Promise(function (resolve, reject) {
+      let tx;
+      try {
+        tx = db.transaction([name], "readonly");
+      } catch (error) {
+        reject(makeError("读取数据库条数失败", error));
+        return;
+      }
+      const request = tx.objectStore(name).count();
+      request.onsuccess = function () {
+        resolve(Number(request.result) || 0);
+      };
+      request.onerror = function () {
+        reject(makeError("读取数据库条数失败", request.error));
+      };
+    });
+  }
+
+  function writeStores(db, rowsByStore) {
+    const names = Object.keys(rowsByStore);
+    return new Promise(function (resolve, reject) {
+      let tx;
+      try {
+        tx = db.transaction(names, "readwrite");
+      } catch (error) {
+        reject(makeError("迁移写入失败", error));
+        return;
+      }
+      let settled = false;
+      tx.oncomplete = function () {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      tx.onerror = function () {
+        if (settled) return;
+        settled = true;
+        reject(makeError("迁移写入失败", tx.error));
+      };
+      tx.onabort = function () {
+        if (settled) return;
+        settled = true;
+        reject(makeError("迁移写入已中止", tx.error));
+      };
+      try {
+        names.forEach(function (name) {
+          const store = tx.objectStore(name);
+          rowsByStore[name].forEach(function (row) {
+            store.put(row);
+          });
+        });
+      } catch (error) {
+        try {
+          tx.abort();
+        } catch (ignore) {
+          /* 事务可能已经结束 */
+        }
+        if (!settled) {
+          settled = true;
+          reject(makeError("迁移写入失败", error));
+        }
+      }
+    });
+  }
+
+  function clearStores(db, names) {
+    return new Promise(function (resolve, reject) {
+      let tx;
+      try {
+        tx = db.transaction(names, "readwrite");
+      } catch (error) {
+        reject(makeError("清理迁移数据失败", error));
+        return;
+      }
+      tx.oncomplete = function () {
+        resolve();
+      };
+      tx.onerror = function () {
+        reject(makeError("清理迁移数据失败", tx.error));
+      };
+      tx.onabort = function () {
+        reject(makeError("清理迁移数据已中止", tx.error));
+      };
+      names.forEach(function (name) {
+        tx.objectStore(name).clear();
+      });
+    });
+  }
+
+  function putSettingRecord(db, key, value) {
+    return new Promise(function (resolve, reject) {
+      let tx;
+      try {
+        tx = db.transaction(["settings"], "readwrite");
+      } catch (error) {
+        reject(makeError("写入迁移标记失败", error));
+        return;
+      }
+      tx.oncomplete = function () {
+        resolve();
+      };
+      tx.onerror = function () {
+        reject(makeError("写入迁移标记失败", tx.error));
+      };
+      tx.onabort = function () {
+        reject(makeError("写入迁移标记已中止", tx.error));
+      };
+      tx.objectStore("settings").put({ key: String(key), value: value });
+    });
+  }
+
+  async function migrateLegacyData(db) {
+    const newBookCount = await countStore(db, "books");
+    if (newBookCount > 0) return { status: "skipped", reason: "new-not-empty" };
+
+    if (!(await hasLegacyDatabase())) {
+      return { status: "skipped", reason: "no-legacy" };
+    }
+
+    let legacy;
+    try {
+      legacy = await openNamedDatabase(LEGACY_DB_NAME, null);
+    } catch (error) {
+      return { status: "failed", error: error };
+    }
+
+    try {
+      const names = STORES.filter(function (name) {
+        return legacy.objectStoreNames.contains(name);
+      });
+      if (!names.length) return { status: "skipped", reason: "legacy-empty" };
+
+      const rowsByStore = {};
+      for (const name of names) {
+        rowsByStore[name] = await readStore(legacy, name);
+      }
+
+      await writeStores(db, rowsByStore);
+
+      for (const name of names) {
+        const actual = await countStore(db, name);
+        const expected = rowsByStore[name].length;
+        if (actual !== expected) {
+          throw new Error(
+            "迁移校验失败：" + name + " 期望 " + expected + " 条，实际 " + actual + " 条",
+          );
+        }
+      }
+
+      await putSettingRecord(db, "legacyMigration", {
+        from: LEGACY_DB_NAME,
+        at: nowIso(),
+      });
+
+      return { status: "migrated", stores: names };
+    } catch (error) {
+      // 回滚新库，保证下次启动可以重试，也保证降级时不会留下半本书。
+      try {
+        await clearStores(db, STORES);
+      } catch (rollbackError) {
+        /* 清理失败时仍尝试降级到旧库 */
+      }
+      return {
+        status: "failed",
+        error: error instanceof Error ? error : new Error(String(error)),
+      };
+    } finally {
+      try {
+        legacy.close();
+      } catch (error) {
+        /* 忽略关闭异常 */
+      }
+    }
+  }
+
+  function openLegacyFallback() {
+    return hasLegacyDatabase()
+      .then(function (exists) {
+        if (!exists) return null;
+        return openNamedDatabase(LEGACY_DB_NAME, null);
+      })
+      .then(function (legacy) {
+        if (!legacy) return null;
+        if (!legacy.objectStoreNames.contains("books")) {
+          legacy.close();
+          return null;
+        }
+        return legacy;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  function openDatabase() {
+    return openNamedDatabase(DB_NAME, DB_VERSION, createSchema)
+      .then(function (db) {
+        return migrateLegacyData(db)
+          .catch(function (error) {
+            return {
+              status: "failed",
+              error: error instanceof Error ? error : new Error(String(error)),
+            };
+          })
+          .then(function (result) {
+            if (result.status !== "failed") {
+              legacyMode = false;
+              return db;
+            }
+            try {
+              db.close();
+            } catch (error) {
+              /* 忽略关闭异常 */
+            }
+            return openLegacyFallback().then(function (legacy) {
+              if (!legacy) throw result.error || new Error("旧数据库迁移失败");
+              legacyMode = true;
+              return legacy;
+            });
+          });
+      })
+      .catch(function (error) {
+        // 新库打不开（例如被其他标签页阻塞）时，尽量退回旧库继续本次会话。
+        return openLegacyFallback().then(function (legacy) {
+          if (!legacy) throw error;
+          legacyMode = true;
+          return legacy;
+        });
+      });
+  }
+
   function run(storeNames, mode, work) {
-    return RP.db.open().then(function (db) {
+    return ND.db.open().then(function (db) {
       return new Promise(function (resolve, reject) {
         let tx;
         try {
@@ -353,9 +660,14 @@
     };
   }
 
-  RP.db = {
+  ND.db = {
     DB_NAME: DB_NAME,
+    LEGACY_DB_NAME: LEGACY_DB_NAME,
     DB_VERSION: DB_VERSION,
+
+    isLegacy: function () {
+      return !!legacyMode;
+    },
 
     open: function () {
       if (!openPromise) {

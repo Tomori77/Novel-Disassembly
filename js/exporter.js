@@ -1,8 +1,8 @@
 (function () {
   "use strict";
 
-  const RP = window.RP;
-  const MANIFEST_FORMAT = "rp-disassembly/1";
+  const ND = window.ND;
+  const MANIFEST_FORMAT = "novel-disassembly/1";
 
   function baseName(fileName) {
     return String(fileName || "未命名").replace(/\.txt$/i, "").trim() || "未命名";
@@ -28,7 +28,7 @@
   }
 
   function chapterBody(chapter, options) {
-    return RP.cleanExportBody(chapter.body || "", options);
+    return ND.cleanExportBody(chapter.body || "", options);
   }
 
   function collect(book, options) {
@@ -91,10 +91,10 @@
   }
 
   function normalizeTemplates(source) {
-    const base = RP.plugins.templates();
+    const base = ND.plugins.templates();
     if (!source || typeof source !== "object") return base;
     const result = {};
-    Object.keys(RP.plugins.DEFAULT_TEMPLATES).forEach(function (key) {
+    Object.keys(ND.plugins.DEFAULT_TEMPLATES).forEach(function (key) {
       result[key] = typeof source[key] === "string" ? source[key] : base[key];
     });
     return result;
@@ -103,14 +103,14 @@
   function prepareItem(book, volume, chapter, options, templates) {
     const entry = buildEntry(book, volume, chapter, options);
     const ctx = { book: entry.book, options: options, variables: null };
-    RP.plugins.normalize(entry, ctx);
-    const variables = RP.plugins.variables(entry, ctx);
+    ND.plugins.normalize(entry, ctx);
+    const variables = ND.plugins.variables(entry, ctx);
 
     const rawTitle = entry.chapter && entry.chapter.rawTitle != null ? String(entry.chapter.rawTitle) : "";
     const titleText = entry.chapter && entry.chapter.title != null ? String(entry.chapter.title) : "";
     const title = titleText || rawTitle || "章节";
     const body = entry.chapter && entry.chapter.body != null ? String(entry.chapter.body) : "";
-    const header = RP.plugins.render(templates.header, variables);
+    const header = ND.plugins.render(templates.header, variables);
 
     return {
       chapter: chapter,
@@ -136,18 +136,18 @@
   }
 
   function chapterFilePath(item, templates) {
-    const rendered = RP.plugins.render(templates.chapterFile, item.variables);
-    const fallback = RP.plugins.render(RP.plugins.DEFAULT_TEMPLATES.chapterFile, item.variables);
-    let name = RP.plugins.safePath(rendered, fallback);
+    const rendered = ND.plugins.render(templates.chapterFile, item.variables);
+    const fallback = ND.plugins.render(ND.plugins.DEFAULT_TEMPLATES.chapterFile, item.variables);
+    let name = ND.plugins.safePath(rendered, fallback);
     if (!/\.txt$/i.test(name)) name += ".txt";
     return name;
   }
 
   function volumeFolderPath(items, templates) {
     const variables = items[0].variables;
-    const rendered = RP.plugins.render(templates.volumeFolder, variables);
-    const fallback = RP.plugins.render(RP.plugins.DEFAULT_TEMPLATES.volumeFolder, variables);
-    return RP.plugins.safePath(rendered, fallback);
+    const rendered = ND.plugins.render(templates.volumeFolder, variables);
+    const fallback = ND.plugins.render(ND.plugins.DEFAULT_TEMPLATES.volumeFolder, variables);
+    return ND.plugins.safePath(rendered, fallback);
   }
 
   function groupHeading(items, volume) {
@@ -162,7 +162,7 @@
       const reasons = (chapter.reasons || []).join("；") || "手动排除";
       lines.push(
         "[" + (chapter.type === "notice" ? "通知" : "章节") + "] " +
-          (chapter.globalIndex != null ? RP.pad(chapter.globalIndex, 4) : "----") +
+          (chapter.globalIndex != null ? ND.pad(chapter.globalIndex, 4) : "----") +
           "  " + (chapter.rawTitle || chapter.title) +
           " — " + reasons,
       );
@@ -172,8 +172,8 @@
 
   function planExport(book, options) {
     const groups = collect(book, options);
-    const templates = RP.plugins.templates();
-    const root = RP.safeFileName(baseName(book.fileName), "书");
+    const templates = ND.plugins.templates();
+    const root = ND.safeFileName(baseName(book.fileName), "书");
     const files = [];
     const volumes = [];
     const directory = [];
@@ -181,7 +181,7 @@
     const usedFolders = new Set();
 
     directory.push("《" + baseName(book.fileName) + "》");
-    directory.push("共 " + groups.length + " 卷 / " + RP.formatCount(book.stats.chapters) + " 节");
+    directory.push("共 " + groups.length + " 卷 / " + ND.formatCount(book.stats.chapters) + " 节");
     directory.push("");
 
     for (const group of groups) {
@@ -258,7 +258,7 @@
   }
 
   function manifestPlugins() {
-    return RP.plugins
+    return ND.plugins
       .list()
       .filter(function (plugin) {
         return plugin.enabled && plugin.compatible && plugin.registered;
@@ -275,19 +275,19 @@
       exportedAt: new Date().toISOString(),
       options: options,
       plugins: manifestPlugins(),
-      templates: plan.templates || RP.plugins.templates(),
+      templates: plan.templates || ND.plugins.templates(),
       volumes: plan.volumes,
     };
   }
 
-  RP.buildManifest = function (book, options) {
+  ND.buildManifest = function (book, options) {
     const opts = normalizeOptions(options);
     return manifestFromPlan(opts, planExport(book, opts));
   };
 
-  RP.buildPlainText = function (book, options) {
+  ND.buildPlainText = function (book, options) {
     const opts = normalizeOptions(options);
-    const templates = RP.plugins.templates();
+    const templates = ND.plugins.templates();
     const groups = collect(book, opts);
     const parts = [];
     for (const group of groups) {
@@ -303,8 +303,8 @@
     return parts.join("\n\n\n");
   };
 
-  RP.exportPlainText = function (book, options) {
-    const text = RP.buildPlainText(book, options);
+  ND.exportPlainText = function (book, options) {
+    const text = ND.buildPlainText(book, options);
     return {
       fileName: baseName(book.fileName) + "_分卷.txt",
       blob: new Blob([text], { type: "text/plain;charset=utf-8" }),
@@ -312,10 +312,10 @@
     };
   };
 
-  RP.exportZip = function (book, options) {
+  ND.exportZip = function (book, options) {
     const opts = normalizeOptions(options);
     const plan = planExport(book, opts);
-    const zip = new RP.ZipWriter();
+    const zip = new ND.ZipWriter();
 
     plan.files.forEach(function (file) {
       zip.add(plan.root + "/" + file.path, file.content);
@@ -332,7 +332,7 @@
     };
   };
 
-  RP.exportFolder = function (book, options) {
+  ND.exportFolder = function (book, options) {
     const opts = normalizeOptions(options);
     const plan = planExport(book, opts);
     const files = plan.files.slice();
@@ -345,7 +345,7 @@
       content: JSON.stringify(manifestFromPlan(opts, plan), null, 2),
     });
 
-    const epub = RP.exportEpub(book, opts);
+    const epub = ND.exportEpub(book, opts);
     epub.fileName = plan.root + ".epub";
 
     return {
@@ -381,11 +381,11 @@
     );
   }
 
-  RP.exportEpub = function (book, options) {
+  ND.exportEpub = function (book, options) {
     const opts = normalizeOptions(options);
-    const templates = RP.plugins.templates();
+    const templates = ND.plugins.templates();
     const groups = collect(book, opts);
-    const zip = new RP.ZipWriter();
+    const zip = new ND.ZipWriter();
     const title = baseName(book.fileName);
     const identifier = "urn:uuid:" + (window.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
     const manifest = [];
@@ -416,7 +416,7 @@
       const navItems = [];
       for (const item of items) {
         index += 1;
-        const id = "c" + RP.pad(index, 5);
+        const id = "c" + ND.pad(index, 5);
         const href = "text/" + id + ".xhtml";
         const chapterTitle = item.title;
         zip.add("OEBPS/" + href, xhtmlDocument(item.header || chapterTitle, item.body));
@@ -463,13 +463,13 @@
     };
   };
 
-  RP.buildEpubBlob = function (book, options) {
-    return RP.exportEpub(book, options).blob;
+  ND.buildEpubBlob = function (book, options) {
+    return ND.exportEpub(book, options).blob;
   };
 
-  RP.buildChapterFile = function (book, chapter, options) {
+  ND.buildChapterFile = function (book, chapter, options) {
     const opts = normalizeOptions(options);
-    const templates = RP.plugins.templates();
+    const templates = ND.plugins.templates();
     const volume = findVolume(book, chapter);
     const item = prepareItem(book, volume, chapter, opts, templates);
     let fileName = chapterFilePath(item, templates);
@@ -484,7 +484,7 @@
     };
   };
 
-  RP.buildTemplatePreview = function (book, options, templatesOverride) {
+  ND.buildTemplatePreview = function (book, options, templatesOverride) {
     if (!book) return null;
     const opts = normalizeOptions(options);
     const templates = normalizeTemplates(templatesOverride);
@@ -516,7 +516,7 @@
     return fallback;
   };
 
-  RP.countSelection = function (book, options) {
+  ND.countSelection = function (book, options) {
     const opts = normalizeOptions(options);
     let total = 0;
     let excluded = 0;

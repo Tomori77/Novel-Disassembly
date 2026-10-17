@@ -1,6 +1,6 @@
 # 旧版单文件（已归档）
 
-`RP-Disassembly.html` 是最早的单文件版本，代码内没有任何地方引用它，当前版本 `index.html` 已完全覆盖其功能。
+`Novel-Disassembly.html` 是最早的单文件版本（原 `RP-Disassembly.html`，本次更名），代码内没有任何地方引用它，当前版本 `index.html` 已完全覆盖其功能。
 
 ## 保留原因
 
@@ -23,7 +23,7 @@
 
 ## 使用
 
-双击 `legacy/RP-Disassembly.html` 即可，无需服务器。导入 TXT 后按正则切分，支持浏览、改标题、导出全部或当前章节。
+双击 `legacy/Novel-Disassembly.html` 即可，无需服务器。导入 TXT 后按正则切分，支持浏览、改标题、导出全部或当前章节。
 
 ## 维护
 

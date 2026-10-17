@@ -7,6 +7,7 @@ Novel-Disassembly 的导出插件放在这里。插件可以规范化导出词�
 - 插件页：index.html → 侧栏“插件”
 - 默认不启用任何插件，默认导出结果与以前一致
 - 插件是本地经典脚本，兼容 `file://` 双击打开；无依赖、无构建、不能联网安装
+- 全局入口为 `window.ND`；`window.RP = window.ND` 是永久别名，旧插件用 `RP.plugins.register` 仍可工作
 
 ## 目录
 
@@ -45,8 +46,8 @@ plugins/
    ```js
    (function () {
      "use strict";
-     if (!window.RP || !window.RP.plugins) return;
-     RP.plugins.register({
+     if (!window.ND || !window.ND.plugins) return;
+     ND.plugins.register({
        id: "my-plugin",
        apiVersion: 1,
        hooks: {
@@ -58,6 +59,8 @@ plugins/
      });
    })();
    ```
+
+   旧插件的 `if (!window.RP || !window.RP.plugins) return; RP.plugins.register(...)` 写法无需修改，别名会指向同一个对象。
 
 4. 在项目根目录生成清单：
 

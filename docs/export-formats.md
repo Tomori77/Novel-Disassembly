@@ -86,7 +86,7 @@
 
 ```json
 {
-  "schema": "rp-disassembly/book/1",
+  "schema": "novel-disassembly/book/1",
   "book": { "title": "书名", "fileName": "书名.txt", "stats": {} },
   "volumes": [{
     "number": 1, "title": "第一卷 魔性不改",

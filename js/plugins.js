@@ -1,12 +1,12 @@
 (function () {
   "use strict";
 
-  const RP = window.RP;
-  if (!RP) return;
+  const ND = window.ND;
+  if (!ND) return;
 
   const API_VERSION = 1;
-  const TEMPLATE_KEY = "rp-disassembly-templates-v1";
-  const PLUGIN_STATE_KEY = "rp-disassembly-plugin-state-v1";
+  const TEMPLATE_KEY = "novel-disassembly-templates-v1";
+  const PLUGIN_STATE_KEY = "novel-disassembly-plugin-state-v1";
   const MANIFEST_SCRIPT = "plugins/index.js";
 
   const DEFAULT_TEMPLATES = Object.freeze({
@@ -66,7 +66,7 @@
   }
 
   function pad(value, length) {
-    return RP.pad(value, length);
+    return ND.pad(value, length);
   }
 
   function baseName(fileName) {
@@ -97,13 +97,13 @@
         );
     const volumeSafe = volume.synthetic
       ? "序章"
-      : RP.safeFileName(volume.name || volume.title, "卷");
+      : ND.safeFileName(volume.name || volume.title, "卷");
     const volumeTitle = String(volume.name || volume.title || "");
     const title = chapter.title != null ? String(chapter.title) : "";
 
     return {
       book: bookName,
-      bookSafe: RP.safeFileName(bookName, "书"),
+      bookSafe: ND.safeFileName(bookName, "书"),
       volume: String(volume.title || ""),
       volumeNo: volumeNo,
       volumeSafe: volumeSafe,
@@ -111,7 +111,7 @@
       chapterNo: index.global != null ? pad(index.global, 4) : "0000",
       localNo: index.local != null ? pad(index.local, 4) : "0000",
       title: title,
-      titleSafe: RP.safeFileName(title, "章节"),
+      titleSafe: ND.safeFileName(title, "章节"),
       rawTitle: chapter.rawTitle != null ? String(chapter.rawTitle) : title,
       type: chapter.type || "chapter",
       date: localDate(),
@@ -194,7 +194,7 @@
     return record;
   }
 
-  RP.plugins = {
+  ND.plugins = {
     apiVersion: API_VERSION,
     DEFAULT_TEMPLATES: DEFAULT_TEMPLATES,
 
@@ -263,12 +263,12 @@
         if (typeof document === "undefined") {
           state.loaded = true;
           state.loading = null;
-          resolve(RP.plugins.list());
+          resolve(ND.plugins.list());
           return;
         }
 
         Array.prototype.slice
-          .call(document.querySelectorAll("script[data-rp-plugin]"))
+          .call(document.querySelectorAll("script[data-nd-plugin]"))
           .forEach(function (script) {
             script.remove();
           });
@@ -278,12 +278,13 @@
         state.loaded = false;
         state.indexLoaded = false;
         state.indexError = "";
+        window.ND_PLUGIN_INDEX = null;
         window.RP_PLUGIN_INDEX = null;
 
         function finish() {
           state.loaded = true;
           state.loading = null;
-          resolve(RP.plugins.list());
+          resolve(ND.plugins.list());
         }
 
         loadScript(MANIFEST_SCRIPT).then(function (error) {
@@ -293,13 +294,20 @@
             return;
           }
 
-          if (!Array.isArray(window.RP_PLUGIN_INDEX)) {
-            state.indexError = "插件清单格式错误：plugins/index.js 未设置 window.RP_PLUGIN_INDEX 数组";
+          const index = Array.isArray(window.ND_PLUGIN_INDEX)
+            ? window.ND_PLUGIN_INDEX
+            : Array.isArray(window.RP_PLUGIN_INDEX)
+              ? window.RP_PLUGIN_INDEX
+              : null;
+          if (!index) {
+            state.indexError =
+              "插件清单格式错误：plugins/index.js 未设置 window.ND_PLUGIN_INDEX 数组" +
+              "（兼容旧全局 window.RP_PLUGIN_INDEX）";
             finish();
             return;
           }
           state.indexLoaded = true;
-          registerManifest(window.RP_PLUGIN_INDEX);
+          registerManifest(index);
 
           const queue = state.records.slice().sort(function (a, b) {
             return priorityOf(a) - priorityOf(b) || a.order - b.order;
@@ -315,7 +323,11 @@
                     return;
                   }
                   if (!record.registered) {
-                    appendError(record, "脚本未调用 RP.plugins.register 注册插件 " + record.id);
+                    appendError(
+                      record,
+                      "脚本未调用 ND.plugins.register 注册插件 " + record.id +
+                        "（旧插件仍可使用 window.RP 别名注册）",
+                    );
                   }
                 });
               });
@@ -406,7 +418,7 @@
     },
 
     setTemplates: function (patch) {
-      const current = RP.plugins.templates();
+      const current = ND.plugins.templates();
       const source = patch && typeof patch === "object" ? patch : {};
       const next = {};
       Object.keys(DEFAULT_TEMPLATES).forEach(function (key) {
@@ -461,7 +473,7 @@
     },
 
     status: function () {
-      const list = RP.plugins.list();
+      const list = ND.plugins.list();
       return {
         loaded: !!state.loaded,
         loading: !!state.loading,
@@ -542,7 +554,7 @@
       const script = document.createElement("script");
       script.src = src;
       script.async = false;
-      script.setAttribute("data-rp-plugin", "1");
+      script.setAttribute("data-nd-plugin", "1");
       script.onload = function () {
         resolve(null);
       };

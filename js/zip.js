@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  const RP = window.RP;
+  const ND = window.ND;
   const encoder = new TextEncoder();
 
   const CRC_TABLE = (function () {
@@ -104,7 +104,7 @@
     }
   }
 
-  RP.ZipWriter = ZipWriter;
+  ND.ZipWriter = ZipWriter;
 
   const decoder = new TextDecoder("utf-8");
 
@@ -117,7 +117,7 @@
     return new Uint8Array(buffer);
   }
 
-  RP.readZip = async function (input) {
+  ND.readZip = async function (input) {
     const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
     if (!bytes.length) throw new Error("ZIP 文件为空");
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);

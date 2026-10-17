@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  if (!window.RP || !window.RP.plugins) return;
+  if (!window.ND || !window.ND.plugins) return;
 
   // 匹配标题末尾的更新/求票类括号标注，例如：
   // （为盟主加更）（庆祝100月票加更）（3月月票加更）（求月票）（感谢打赏）
@@ -16,7 +16,7 @@
     return value || String(title == null ? "" : title);
   }
 
-  RP.plugins.register({
+  ND.plugins.register({
     id: "clean-annotations",
     name: "去除更新标注",
     version: "0.1.0",

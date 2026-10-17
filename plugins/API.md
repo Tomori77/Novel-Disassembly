@@ -2,7 +2,9 @@
 
 版本：`apiVersion: 1`
 
-本文档描述 Novel-Disassembly 的导出插件接口、词条模型、加载流程、变量、模板与安全边界。插件是普通经典脚本（非 ES module），通过 `window.RP.plugins.register(def)` 注册，兼容 `file://` 双击打开。
+本文档描述 Novel-Disassembly 的导出插件接口、词条模型、加载流程、变量、模板与安全边界。插件是普通经典脚本（非 ES module），通过 `window.ND.plugins.register(def)` 注册，兼容 `file://` 双击打开。
+
+> 兼容性：`window.RP = window.ND` 是永久保留的别名，旧插件里的 `RP.plugins.register` 仍然有效，无需修改。
 
 ---
 
@@ -11,9 +13,9 @@
 ```js
 (function () {
   "use strict";
-  if (!window.RP || !window.RP.plugins) return;
+  if (!window.ND || !window.ND.plugins) return;
 
-  RP.plugins.register({
+  ND.plugins.register({
     id: "clean-annotations",
     name: "去除更新标注",
     version: "0.1.0",
@@ -93,10 +95,10 @@
 ## 3. 生命周期与加载顺序
 
 1. `index.html` 先加载 `js/plugins.js`。
-2. `js/app.js` 初始化时调用 `RP.plugins.load()`。
-3. 加载器插入 `plugins/index.js`，读取 `window.RP_PLUGIN_INDEX`。
+2. `js/app.js` 初始化时调用 `ND.plugins.load()`。
+3. 加载器插入 `plugins/index.js`，优先读取 `window.ND_PLUGIN_INDEX`，缺失时回退到旧的 `window.RP_PLUGIN_INDEX`（加载前两者都会清空）。
 4. 按 `priority` 升序（同优先级按清单顺序）依次插入插件入口脚本。
-5. 插件脚本调用 `RP.plugins.register(def)`。
+5. 插件脚本调用 `ND.plugins.register(def)`。
 6. 每次导出时：
    - 构造词条；
    - 按 `priority` 升序执行所有已启用、兼容、已注册插件的 `normalizeEntry`；
@@ -107,7 +109,7 @@
 
 显式开关（localStorage）优先于 `plugin.json` 的 `enabled`。开关即时生效，不需要重新加载脚本。
 
-`RP.plugins.load()` 返回 Promise；刷新按钮会移除旧脚本、清空注册表并重新加载。
+`ND.plugins.load()` 返回 Promise；刷新按钮会移除旧脚本、清空注册表并重新加载。
 
 ---
 
@@ -192,12 +194,12 @@ header:       "{{title}}"
 
 ### 模板保存位置
 
-`localStorage` 键：`rp-disassembly-templates-v1`。
+`localStorage` 键：`novel-disassembly-templates-v1`。
 
 ```js
-RP.plugins.templates();      // { volumeFolder, chapterFile, header }
-RP.plugins.setTemplates({ header: "{{title}}" });
-RP.plugins.defaultTemplates();
+ND.plugins.templates();      // { volumeFolder, chapterFile, header }
+ND.plugins.setTemplates({ header: "{{title}}" });
+ND.plugins.defaultTemplates();
 ```
 
 ### 路径安全
@@ -246,7 +248,7 @@ RP.plugins.defaultTemplates();
 - 插件不能联网安装；没有远程市场或自动下载。
 - 插件不能绕过浏览器的同源策略、文件系统权限或下载限制。
 - 导出路径做了分段安全化，避免 `..`、绝对路径和 Windows 非法字符。
-- 插件开关与模板存放在 localStorage；不涉及 IndexedDB 或本地服务器。
+- 插件开关与模板存放在 localStorage；键名分别为 `novel-disassembly-plugin-state-v1` 与 `novel-disassembly-templates-v1`，不涉及 IndexedDB 或本地服务器。旧键 `rp-disassembly-*` 会在启动时复制到新键，旧键保留。
 
 ---
 
@@ -293,7 +295,7 @@ powershell -File tools/build-plugins.ps1
 脚本扫描 `plugins/*/plugin.json`，跳过 `_template`，校验必填项、id 格式、入口文件存在性，生成：
 
 ```js
-window.RP_PLUGIN_INDEX = [
+window.ND_PLUGIN_INDEX = [
   {
     id: "clean-annotations",
     name: "去除更新标注",
@@ -305,7 +307,10 @@ window.RP_PLUGIN_INDEX = [
     description: "..."
   }
 ];
+
 ```
+
+加载器兼容仍写 `window.RP_PLUGIN_INDEX` 的旧清单文件；但生成脚本只写 `window.ND_PLUGIN_INDEX`。
 
 ---
 
@@ -323,6 +328,7 @@ window.RP_PLUGIN_INDEX = [
 ## 11. 版本兼容
 
 - 当前 API 版本为 `1`。
+- 全局入口为 `window.ND`；`window.RP` 是永久兼容别名，旧插件继续工作。
 - `apiVersion === 1` 的插件直接加载。
 - 其他版本标记为不兼容，不执行钩子。
 - 后续新增钩子不会改变现有钩子的签名；已有插件可继续工作。
@@ -342,17 +348,17 @@ window.RP_PLUGIN_INDEX = [
 ## 13. 运行时 API 摘要
 
 ```js
-RP.plugins.register(def)          // 注册插件
-RP.plugins.list()                 // [{id,name,version,priority,enabled,error,hooks,description,...}]
-RP.plugins.load()                 // Promise，加载清单与插件脚本
-RP.plugins.normalize(entry, ctx)  // 依次执行 normalizeEntry
-RP.plugins.variables(entry, ctx)  // 默认变量 + defineVariables
-RP.plugins.render(template, vars) // {{var}} 替换
-RP.plugins.templates()            // 当前模板
-RP.plugins.setTemplates(patch)    // 保存模板
-RP.plugins.defaultTemplates()     // 默认模板
-RP.plugins.isEnabled(id)
-RP.plugins.setEnabled(id, bool)
-RP.plugins.safePath(value, fallback)
-RP.plugins.status()               // 加载状态、清单路径、错误数
+ND.plugins.register(def)          // 注册插件
+ND.plugins.list()                 // [{id,name,version,priority,enabled,error,hooks,description,...}]
+ND.plugins.load()                 // Promise，加载清单与插件脚本
+ND.plugins.normalize(entry, ctx)  // 依次执行 normalizeEntry
+ND.plugins.variables(entry, ctx)  // 默认变量 + defineVariables
+ND.plugins.render(template, vars) // {{var}} 替换
+ND.plugins.templates()            // 当前模板
+ND.plugins.setTemplates(patch)    // 保存模板
+ND.plugins.defaultTemplates()     // 默认模板
+ND.plugins.isEnabled(id)
+ND.plugins.setEnabled(id, bool)
+ND.plugins.safePath(value, fallback)
+ND.plugins.status()               // 加载状态、清单路径、错误数
 ```

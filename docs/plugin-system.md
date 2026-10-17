@@ -13,7 +13,7 @@
 ### 2.1 注册
 
 ```js
-RP.plugins.register({
+ND.plugins.register({
   id: "clean-annotations",
   name: "去除更新标注",
   version: "0.1.0",
@@ -31,38 +31,40 @@ RP.plugins.register({
 - `defineVariables` 返回值以 `{{name}}`（无冲突时）和 `{{plugin.<id>.<name>}}` 暴露。
 - 插件异常被捕获并记录，不中断导出。
 - `apiVersion !== 1` 视为不兼容，不执行钩子。
+- 全局命名空间为 `window.ND`；`window.RP` 是永久兼容别名，旧插件里的 `RP.plugins.register` 无需修改仍可注册。
 
 ### 2.2 宿主 API
 
 ```js
-RP.plugins.register(def)
-RP.plugins.list()
-RP.plugins.load()
-RP.plugins.normalize(entry, ctx)
-RP.plugins.variables(entry, ctx)
-RP.plugins.render(template, vars)
-RP.plugins.templates() / setTemplates(patch)
-RP.plugins.isEnabled(id) / setEnabled(id, bool)
-RP.plugins.safePath(value, fallback)
-RP.plugins.status()
+ND.plugins.register(def)
+ND.plugins.list()
+ND.plugins.load()
+ND.plugins.normalize(entry, ctx)
+ND.plugins.variables(entry, ctx)
+ND.plugins.render(template, vars)
+ND.plugins.templates() / setTemplates(patch)
+ND.plugins.isEnabled(id) / setEnabled(id, bool)
+ND.plugins.safePath(value, fallback)
+ND.plugins.status()
 ```
 
 ### 2.3 清单与加载
 
 ```text
 plugins/
-├─ index.js                  # window.RP_PLUGIN_INDEX = [...]
+├─ index.js                  # window.ND_PLUGIN_INDEX = [...]
 ├─ <id>/
 │  ├─ plugin.json            # id/name/version/apiVersion/entry/enabled/priority
-│  ├─ index.js               # 调用 RP.plugins.register
+│  ├─ index.js               # 调用 ND.plugins.register
 │  └─ README.md
 ├─ _template/                # 新建插件模板
 └─ schema/plugin.schema.json
 ```
 
-- `tools/build-plugins.ps1` 扫描 `plugin.json`，生成 `plugins/index.js`。
+- `tools/build-plugins.ps1` 扫描 `plugin.json`，生成 `plugins/index.js`，写入 `window.ND_PLUGIN_INDEX`。
+- 加载器优先读取 `window.ND_PLUGIN_INDEX`，回退到旧的 `window.RP_PLUGIN_INDEX`；加载前会清空两者。
 - 页面启动时动态插入 `<script src="plugins/index.js">`，再按 priority 加载各插件脚本。
-- 未显式开关时使用 manifest 的 `enabled`；用户开关存 `localStorage`。
+- 未显式开关时使用 manifest 的 `enabled`；用户开关存 `localStorage`（`novel-disassembly-plugin-state-v1`）。
 
 ### 2.4 生命周期
 
@@ -102,7 +104,7 @@ plugins/
 ### 3.2 导出插件
 
 ```js
-RP.plugins.register({
+ND.plugins.register({
   id: "markdown-exporter",
   apiVersion: 2,
   exporters: [{
@@ -150,7 +152,7 @@ ui: {
 ### 3.5 插件存储
 
 ```js
-const store = RP.core.store("ai-analysis");
+const store = ND.core.store("ai-analysis");
 await store.set("config", {...});
 await store.get("config", null);
 ```

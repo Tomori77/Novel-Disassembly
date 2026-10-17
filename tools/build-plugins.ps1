@@ -112,7 +112,7 @@ if ($sorted.Count -eq 0) {
 }
 
 $content = "// 由 tools/build-plugins.ps1 自动生成，请勿手工修改。`r`n" +
-  "window.RP_PLUGIN_INDEX = " + $json + ";`r`n"
+  "window.ND_PLUGIN_INDEX = " + $json + ";`r`n"
 
 [System.IO.File]::WriteAllText($outFile, $content, (New-Object System.Text.UTF8Encoding($false)))
 

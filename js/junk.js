@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  const RP = window.RP;
+  const ND = window.ND;
 
   const JUNK_EXACT =
     /^(?:请假|请假条|请假一天|请假两天|请假一周|请假几天|今天无更|今日无更|明天无更|今天不更|断更|停更|暂停更新|恢复更新|更新说明|更新公告|加更说明|求票|求月票|求推荐票|求订阅|求收藏|感谢|鸣谢|公告|通知|说明|解释|声明|单章|新书预告|上架感言|完本感言|卷末感言|作者的话|测试|防盗|章节错误|更正)$/;
@@ -16,11 +16,11 @@
     if (chapter.type === "notice") {
       return String(chapter.rawTitle || chapter.title || "").trim();
     }
-    const label = RP.parseChapterLabel(chapter.title || chapter.rawTitle || "");
+    const label = ND.parseChapterLabel(chapter.title || chapter.rawTitle || "");
     return label.name || "";
   }
 
-  RP.classifyChapter = function (chapter, options) {
+  ND.classifyChapter = function (chapter, options) {
     if (chapter.type === "volumeNote") {
       return { type: "normal", score: 0, reasons: [] };
     }
@@ -89,20 +89,20 @@
     return { type: type, score: score, reasons: reasons };
   };
 
-  RP.classifyBook = function (book, options) {
+  ND.classifyBook = function (book, options) {
     for (const chapter of book.chapters) {
-      const result = RP.classifyChapter(chapter, options);
+      const result = ND.classifyChapter(chapter, options);
       chapter.junkType = result.type;
       chapter.junkScore = result.score;
       chapter.reasons = result.reasons;
       chapter.manual = false;
       chapter.excluded = result.type === "junk";
     }
-    RP.markDuplicates(book);
+    ND.markDuplicates(book);
     return book;
   };
 
-  RP.markDuplicates = function (book) {
+  ND.markDuplicates = function (book) {
     const seen = new Map();
     for (const chapter of book.chapters) {
       if (chapter.type === "volumeNote") continue;

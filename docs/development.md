@@ -36,7 +36,7 @@ docs/                   工程文档；本地素材默认不纳管
 
 1. 复制 `plugins/_template` 为 `plugins/<id>`
 2. 修改 `plugin.json`（id/name/version/apiVersion/entry/priority）
-3. 编写 `index.js`，调用 `RP.plugins.register`
+3. 编写 `index.js`，调用 `ND.plugins.register`
 4. 运行：
 
 ```powershell
@@ -58,7 +58,7 @@ Get-ChildItem js -Filter *.js | ForEach-Object { node --check $_.FullName }
 每次改核心导出/插件管线，至少验证：
 
 - 未启用插件时 TXT/ZIP/EPUB 与基线一致
-- `_manifest.json` 旧字段一致
+- `_manifest.json` 除 `format` 从 `rp-disassembly/1` 变为 `novel-disassembly/1` 外字段一致
 - 默认选项下章节文件数量/路径一致
 - 《蛊》样例：6 卷 / 2364 章节 / 19 条排除（默认导出 2367 个章节文件）
 
@@ -69,6 +69,14 @@ Get-ChildItem js -Filter *.js | ForEach-Object { node --check $_.FullName }
 - ZIP 导出 → 读回 → 卷/章/标题/排除状态一致
 - 文件夹导出 → 文件夹导入 → 一致
 - 无 manifest 目录 → 结构推断可用
+
+### 迁移与兼容
+
+- 用旧库名 `rp-disassembly` 预置书与 settings，加载新版 `js/db.js`，确认新库复制成功、条数一致、旧库仍在、`ND.db.isLegacy() === false`
+- 重复执行 `open()`，确认幂等（不重复迁移、不重复书）
+- 预置四个 `rp-disassembly-*` localStorage 键，加载 `js/util.js`，确认新键已复制且旧键保留
+- 用 `rp-disassembly/1` manifest 构造 entries，确认 `ND.importFromEntries` 可导入
+- 加载只调用 `RP.plugins.register` 的旧插件，确认注册与钩子生效；新导出 manifest 的 `format` 为 `novel-disassembly/1`
 
 ### 浏览器
 
@@ -85,6 +93,7 @@ Get-ChildItem js -Filter *.js | ForEach-Object { node --check $_.FullName }
 ## 6. 约定
 
 - 经典 `<script>`，不要改成 ES module（`file://` 下会被 CORS 拦截）
+- 新代码使用 `window.ND` / `ND.*`；`window.RP = window.ND` 是永久兼容别名，不要删除
 - 不引入第三方库；ZIP/DOCX/EPUB 均用内置实现
 - 路径必须经过 `safePath`/服务端校验；不写出 `export/` 或授权目录
 - 不提交密码、密钥、代理 token、受版权保护的小说正文

@@ -1,9 +1,9 @@
 (function () {
   "use strict";
 
-  if (!window.RP || !window.RP.plugins) return;
+  if (!window.ND || !window.ND.plugins) return;
 
-  RP.plugins.register({
+  ND.plugins.register({
     id: "my-plugin",
     name: "我的插件",
     version: "0.1.0",

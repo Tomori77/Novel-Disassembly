@@ -77,7 +77,7 @@ python serve.py --open          # 启动后打开浏览器
 
 ## 持久化与书架
 
-导入成功后，整本书（原文、卷章、标题、排除状态、分类原因等）会写入浏览器 IndexedDB，数据库名 `rp-disassembly`（v1），并按书隔离：
+导入成功后，整本书（原文、卷章、标题、排除状态、分类原因等）会写入浏览器 IndexedDB，数据库名 `novel-disassembly`（v1），并按书隔离：
 
 | 对象仓库 | 主键 | 内容 |
 |---|---|---|
@@ -105,6 +105,14 @@ python serve.py --open          # 启动后打开浏览器
 - 存储只属于当前浏览器与当前来源（`file://` 打开时为该文件来源），不跨浏览器、不跨设备，也不会上传。
 
 降级：IndexedDB 不可用或写入失败时，侧栏显示“未持久化”，书架显示“当前环境不支持持久化”，并只提示一次。导入、编辑、导出等原有流程继续可用，但刷新后修改会丢失。
+
+### 从旧版本迁移
+
+- **IndexedDB**：首次用新版打开时，若新库 `novel-disassembly` 的 `books` 为空，会把旧库 `rp-disassembly` 的 `books`、`sources`、`volumes`、`chapters`、`settings` 五个仓库复制到新库，逐仓库校验条数，并在 `settings` 写入 `legacyMigration = { from: "rp-disassembly", at: "<ISO 时间>" }`。迁移成功后新库直接可用；旧库**保留不删**。若新库已有书则跳过，重复启动不会重复迁移。
+- **迁移失败**：新库仍为空时关闭新库，本次会话改用旧库连接（`ND.db.isLegacy()` 返回 `true`），下次启动会重试迁移；旧库没有数据或迁移成功时返回 `false`。
+- **localStorage**：`js/util.js` 在其它脚本之前同步把 `rp-disassembly-rules-v1`、`rp-disassembly-options-v1`、`rp-disassembly-templates-v1`、`rp-disassembly-plugin-state-v1` 复制到对应的 `novel-disassembly-*` 键；旧键保留，新键已存在时不覆盖。之后只读写新键。
+- **命名空间**：全局入口为 `window.ND`；`window.RP = window.ND` 作为永久兼容别名保留，旧插件里的 `RP.plugins.register` 仍可工作。
+- **manifest**：新导出写 `novel-disassembly/1`；导入同时接受 `novel-disassembly/1` 与旧的 `rp-disassembly/1`，旧 ZIP / 目录仍可回读。
 
 ## 导入
 
@@ -148,7 +156,7 @@ ZIP 文件名仍为 `<书名>_分卷.zip`。项目目录导出写入项目根的
 
 ```json
 {
-  "format": "rp-disassembly/1",
+  "format": "novel-disassembly/1",
   "book": "蛊",
   "exportedAt": "2026-10-17T12:00:00.000Z",
   "options": {
@@ -195,6 +203,7 @@ ZIP 文件名仍为 `<书名>_分卷.zip`。项目目录导出写入项目根的
 - 章节文件内容格式为 `内容头\n\n正文`，默认内容头就是 `{{title}}`，因此与旧版 `标题\n\n正文` 相同；回读时首行若等于 manifest 标题会被去掉。自定义内容头后，回读仍以 manifest 标题为准。
 - 导出的正文已按清洗选项处理（水印、章末附言），回读得到的是清洗后的文本，不等同原始素材。
 - `exportedAt` 每次导出都会变化，其余字段在结构不变时保持稳定。
+- 新版写出 `format: "novel-disassembly/1"`；导入兼容旧的 `format: "rp-disassembly/1"`，旧 ZIP / 目录无需转换。
 
 ## 识别规则
 

@@ -15,6 +15,8 @@
 
 两种方式共用同一套页面与脚本，仅 `js/export-target.js` 在启动时探测 `/api/health` 决定落盘通道。
 
+全局命名空间为 `window.ND`（`js/util.js` 初始化）；`window.RP = window.ND` 是永久兼容别名，旧插件与旧脚本仍可沿用 `RP.*`。
+
 ## 3. 模块
 
 ```text
@@ -75,14 +77,15 @@ index.html
 
 ## 6. 持久化
 
-- 数据库 `rp-disassembly` v1：`books`、`sources`、`volumes`、`chapters`、`settings`。
+- 数据库 `novel-disassembly` v1：`books`、`sources`、`volumes`、`chapters`、`settings`。
+- 首次启动会从旧库 `rp-disassembly` 一次性复制五个仓库并校验条数，写入 `settings.legacyMigration`；旧库保留不删。新库已有书则跳过；迁移失败且新库为空时，本次会话降级使用旧库（`ND.db.isLegacy() === true`），下次启动重试。
 - 复合主键 `[bookId, id]` 避免不同书的 `C00001` 冲突。
 - 导入/切分后全量保存；改标题、排除、批量操作按章增量保存；会话设置防抖保存。
 - 插件数据使用命名空间存储（v2 设计），避免污染核心表。
 
 ## 7. 插件宿主
 
-- 清单：`plugins/index.js`（由 `tools/build-plugins.ps1` 生成），内容为 `window.RP_PLUGIN_INDEX` 数组。
+- 清单：`plugins/index.js`（由 `tools/build-plugins.ps1` 生成），内容为 `window.ND_PLUGIN_INDEX` 数组；加载器同时接受旧的 `window.RP_PLUGIN_INDEX`。
 - 加载：动态插入经典 `<script>`，按 priority 顺序执行，兼容 `file://`。
 - v1 钩子：`normalizeEntry`、`defineVariables`；异常被捕获并记录，不中断导出。
 - v2 计划：`importers`、`exporters`、`ui`、`provides`、实体词条，详见 [plugin-system.md](plugin-system.md)。

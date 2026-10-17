@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://rp-disassembly.local/schema/plugin.schema.json",
+  "$id": "https://novel-disassembly.local/schema/plugin.schema.json",
   "title": "Novel-Disassembly plugin manifest",
   "description": "plugins/<id>/plugin.json",
   "type": "object",

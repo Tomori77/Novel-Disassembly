@@ -1,10 +1,11 @@
 (function () {
   "use strict";
 
-  const RP = window.RP;
+  const ND = window.ND;
   const utf8Decoder = new TextDecoder("utf-8");
   const MANIFEST_NAME = "_manifest.json";
   const META_FILES = /^(目录|剔除清单)\.txt$/i;
+  const MANIFEST_FORMATS = ["novel-disassembly/1", "rp-disassembly/1"];
 
   function decodeText(bytes) {
     const text = utf8Decoder.decode(bytes || new Uint8Array(0));
@@ -71,7 +72,7 @@
   function makeChapter(source, volumeId, index) {
     const type = source.type || "chapter";
     return {
-      id: "C" + RP.pad(index, 5),
+      id: "C" + ND.pad(index, 5),
       type: type,
       rawTitle: source.rawTitle || source.title || "未命名章节",
       title: source.title || source.rawTitle || "未命名章节",
@@ -106,8 +107,13 @@
     } catch (error) {
       throw new Error("_manifest.json 解析失败：" + error.message);
     }
-    if (!data || data.format !== "rp-disassembly/1") {
-      throw new Error("不支持的 manifest 格式：" + (data && data.format ? data.format : "未知"));
+    if (!data || MANIFEST_FORMATS.indexOf(data.format) === -1) {
+      throw new Error(
+        "不支持的 manifest 格式：" +
+          (data && data.format ? data.format : "未知") +
+          "；支持：" +
+          MANIFEST_FORMATS.join("、"),
+      );
     }
 
     const byPath = new Map();
@@ -117,7 +123,7 @@
       return byPath.get(rootPrefix + relative) || byPath.get(relative);
     }
 
-    const bookName = RP.safeFileName(data.book || folderName(rootPrefix), "导入的书");
+    const bookName = ND.safeFileName(data.book || folderName(rootPrefix), "导入的书");
     const volumes = [];
     const chapters = [];
     const parts = [];
@@ -129,7 +135,7 @@
       const name = source.name || "";
       const rawTitle = source.title || (synthetic ? "序章 / 前言" : "第" + (number != null ? number : volumeIndex + 1) + "卷");
       const volume = {
-        id: "V" + RP.pad(volumes.length + 1, 3),
+        id: "V" + ND.pad(volumes.length + 1, 3),
         index: volumes.length,
         synthetic: synthetic,
         number: number,
@@ -145,7 +151,7 @@
           missing += 1;
           return;
         }
-        const raw = RP.normalizeText(entryText(entry));
+        const raw = ND.normalizeText(entryText(entry));
         const title = item.title || item.rawTitle || "未命名章节";
         const chapter = makeChapter(
           {
@@ -294,7 +300,7 @@
 
     function addVolume(info, files) {
       const volume = {
-        id: "V" + RP.pad(volumes.length + 1, 3),
+        id: "V" + ND.pad(volumes.length + 1, 3),
         index: volumes.length,
         synthetic: info.synthetic,
         number: info.number,
@@ -313,9 +319,9 @@
 
       let localIndex = 0;
       files.forEach(function (entry) {
-        const text = RP.normalizeText(entryText(entry));
+        const text = ND.normalizeText(entryText(entry));
         const inferred = inferTitle(text, entry.path);
-        const label = RP.parseChapterLabel(inferred.title);
+        const label = ND.parseChapterLabel(inferred.title);
         globalIndex += 1;
         localIndex += 1;
         const chapter = makeChapter(
@@ -351,7 +357,7 @@
 
     const rawText = parts.join("\n\n");
     return {
-      fileName: RP.safeFileName(bookName || folderName(root), "导入的书") + ".txt",
+      fileName: ND.safeFileName(bookName || folderName(root), "导入的书") + ".txt",
       rawText: rawText,
       volumes: volumes,
       chapters: chapters,
@@ -362,7 +368,7 @@
     };
   }
 
-  RP.importFromEntries = function (entries) {
+  ND.importFromEntries = function (entries) {
     const list = normalizeEntries(entries);
     if (!list.length) throw new Error("没有可读取的文件");
 

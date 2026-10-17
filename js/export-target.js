@@ -1,8 +1,8 @@
 (function () {
   "use strict";
 
-  const RP = window.RP;
-  if (!RP) return;
+  const ND = window.ND;
+  if (!ND) return;
 
   const HANDLE_KEY = "exportRootHandle";
   const HEALTH_TIMEOUT = 1500;
@@ -105,9 +105,9 @@
   }
 
   async function loadPickerHandle() {
-    if (!RP.db || typeof RP.db.getSetting !== "function") return;
+    if (!ND.db || typeof ND.db.getSetting !== "function") return;
     try {
-      const handle = await RP.db.getSetting(HANDLE_KEY, null);
+      const handle = await ND.db.getSetting(HANDLE_KEY, null);
       if (!handle || typeof handle.getDirectoryHandle !== "function") return;
       state.handle = handle;
       state.root = handle.name || "";
@@ -280,7 +280,7 @@
 
     let handle = state.handle;
     if (!handle || state.permission !== "granted") {
-      const options = { mode: "readwrite", id: "rp-export-root" };
+      const options = { mode: "readwrite", id: "novel-export-root" };
       if (handle) options.startIn = handle;
       try {
         handle = await window.showDirectoryPicker(options);
@@ -292,9 +292,9 @@
       state.exportRoot = state.root ? state.root + "/export" : "";
       state.permission = "granted";
       snapshot();
-      if (RP.db && typeof RP.db.setSetting === "function") {
+      if (ND.db && typeof ND.db.setSetting === "function") {
         try {
-          await RP.db.setSetting(HANDLE_KEY, handle);
+          await ND.db.setSetting(HANDLE_KEY, handle);
         } catch (error) {
           /* 持久化失败不阻断本次导出，下次需要重新选择目录 */
         }
@@ -399,7 +399,7 @@
     throw new Error(UNSUPPORTED_TEXT);
   }
 
-  RP.exportTarget = {
+  ND.exportTarget = {
     init: init,
     mode: mode,
     info: info,

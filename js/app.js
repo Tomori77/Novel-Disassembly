@@ -1,12 +1,12 @@
 (function () {
   "use strict";
 
-  const RP = window.RP;
+  const ND = window.ND;
   const $ = function (id) {
     return document.getElementById(id);
   };
-  const RULES_KEY = "rp-disassembly-rules-v1";
-  const OPTIONS_KEY = "rp-disassembly-options-v1";
+  const RULES_KEY = "novel-disassembly-rules-v1";
+  const OPTIONS_KEY = "novel-disassembly-options-v1";
 
   const state = {
     fileName: "",
@@ -191,7 +191,7 @@
     if (!full && !needBook) return persist.chain;
 
     return enqueue(function () {
-      if (full) return RP.db.saveBook(book);
+      if (full) return ND.db.saveBook(book);
       return ids
         .reduce(function (chain, id) {
           return chain.then(function () {
@@ -199,11 +199,11 @@
               return item.id === id;
             });
             if (!chapter) return null;
-            return RP.db.updateChapter(book.id, chapter);
+            return ND.db.updateChapter(book.id, chapter);
           });
         }, Promise.resolve())
         .then(function () {
-          if (needBook) return RP.db.updateBook(book);
+          if (needBook) return ND.db.updateBook(book);
           return null;
         });
     });
@@ -241,16 +241,16 @@
       lastFilter: state.filter || "",
     };
     return enqueue(function () {
-      return RP.db
+      return ND.db
         .setSetting("lastBookId", payload.lastBookId)
         .then(function () {
-          return RP.db.setSetting("lastChapterId", payload.lastChapterId);
+          return ND.db.setSetting("lastChapterId", payload.lastChapterId);
         })
         .then(function () {
-          return RP.db.setSetting("lastView", payload.lastView);
+          return ND.db.setSetting("lastView", payload.lastView);
         })
         .then(function () {
-          return RP.db.setSetting("lastFilter", payload.lastFilter);
+          return ND.db.setSetting("lastFilter", payload.lastFilter);
         });
     }, true);
   }
@@ -264,7 +264,7 @@
   function renderShelfStorage() {
     const node = $("shelfStorage");
     if (!node) return;
-    RP.db.estimate().then(function (info) {
+    ND.db.estimate().then(function (info) {
       if (!info || !info.supported) {
         node.textContent = "存储占用：不可用";
         return;
@@ -293,7 +293,7 @@
 
     let books = [];
     try {
-      books = await RP.db.listBooks();
+      books = await ND.db.listBooks();
       persist.ready = true;
       renderSaveStatus();
     } catch (error) {
@@ -312,16 +312,16 @@
         return (
           '<article class="shelf-row">' +
           '<div class="shelf-main">' +
-          '<div class="shelf-title-row"><strong>' + RP.escapeHtml(title) + "</strong>" +
+          '<div class="shelf-title-row"><strong>' + ND.escapeHtml(title) + "</strong>" +
           '<span class="badge info">' + sourceLabel(book.source) + "</span></div>" +
           '<div class="shelf-meta">' + formatDateTime(book.updatedAt) + " · " +
           Number(stats.volumes || 0) + " 卷 · " +
-          RP.formatCount(stats.chapters) + " 节 · 排除 " + excluded + " 条</div>" +
+          ND.formatCount(stats.chapters) + " 节 · 排除 " + excluded + " 条</div>" +
           "</div>" +
           '<div class="actions">' +
-          '<button data-shelf-open="' + RP.escapeHtml(book.id) + '">打开</button>' +
-          '<button class="danger" data-shelf-delete="' + RP.escapeHtml(book.id) +
-          '" data-shelf-title="' + RP.escapeHtml(title) + '">删除</button>' +
+          '<button data-shelf-open="' + ND.escapeHtml(book.id) + '">打开</button>' +
+          '<button class="danger" data-shelf-delete="' + ND.escapeHtml(book.id) +
+          '" data-shelf-title="' + ND.escapeHtml(title) + '">删除</button>' +
           "</div></article>"
         );
       });
@@ -382,14 +382,14 @@
     if (!id || !persist.available) return;
     try {
       await flushPendingWrites();
-      const book = await RP.db.loadBook(id);
+      const book = await ND.db.loadBook(id);
       if (!book) {
         showToast("书籍不存在，可能已被删除");
         renderShelf();
         return;
       }
-      const lastBookId = await RP.db.getSetting("lastBookId", "");
-      const chapterId = lastBookId === id ? await RP.db.getSetting("lastChapterId", "") : "";
+      const lastBookId = await ND.db.getSetting("lastBookId", "");
+      const chapterId = lastBookId === id ? await ND.db.getSetting("lastChapterId", "") : "";
       applyStoredBook(book, chapterId, "toc", "");
       showToast("已打开《" + (book.title || bookTitle(book.fileName)) + "》");
     } catch (error) {
@@ -407,11 +407,11 @@
         cancelPendingWrites();
         await persist.chain;
       }
-      await RP.db.deleteBook(id);
+      await ND.db.deleteBook(id);
       if (isCurrent) {
         resetBookState();
-        await RP.db.setSetting("lastBookId", "");
-        await RP.db.setSetting("lastChapterId", "");
+        await ND.db.setSetting("lastBookId", "");
+        await ND.db.setSetting("lastChapterId", "");
       }
       renderShelf();
       showToast("已从书架删除：" + name);
@@ -426,7 +426,7 @@
     try {
       cancelPendingWrites();
       await persist.chain;
-      await RP.db.clearAll();
+      await ND.db.clearAll();
       resetBookState();
       renderShelf();
       showToast("书架已清空");
@@ -438,18 +438,18 @@
   function persistImportedBook(book, source) {
     if (!persist.available || !book) return Promise.resolve();
     return enqueue(async function () {
-      if (!book.id) book.id = await RP.db.newId("book");
+      if (!book.id) book.id = await ND.db.newId("book");
       book.title = book.title || bookTitle(book.fileName);
       book.source = source || book.source || "txt";
       if (!book.createdAt) book.createdAt = new Date().toISOString();
-      await RP.db.saveBook(book);
-      await RP.db.setSetting("lastBookId", book.id);
-      await RP.db.setSetting(
+      await ND.db.saveBook(book);
+      await ND.db.setSetting("lastBookId", book.id);
+      await ND.db.setSetting(
         "lastChapterId",
         state.book === book ? state.selectedId || "" : "",
       );
-      await RP.db.setSetting("lastView", state.view);
-      await RP.db.setSetting("lastFilter", state.filter || "");
+      await ND.db.setSetting("lastView", state.view);
+      await ND.db.setSetting("lastFilter", state.filter || "");
       renderShelf();
       showToast("已保存到书架");
     });
@@ -468,10 +468,15 @@
 
   async function restoreSession() {
     try {
-      await RP.db.open();
+      await ND.db.open();
       persist.ready = true;
       persist.available = true;
       renderSaveStatus();
+      if (typeof ND.db.isLegacy === "function" && ND.db.isLegacy()) {
+        setTimeout(function () {
+          showToast("旧书库迁移未完成，本次使用旧数据；下次启动会自动重试");
+        }, 1200);
+      }
     } catch (error) {
       persistenceError(error);
       return;
@@ -479,7 +484,7 @@
 
     let lastBookId = "";
     try {
-      lastBookId = await RP.db.getSetting("lastBookId", "");
+      lastBookId = await ND.db.getSetting("lastBookId", "");
     } catch (error) {
       persistenceError(error);
       return;
@@ -490,15 +495,15 @@
     }
 
     try {
-      const book = await RP.db.loadBook(lastBookId);
+      const book = await ND.db.loadBook(lastBookId);
       if (!book) {
-        await RP.db.setSetting("lastBookId", "");
+        await ND.db.setSetting("lastBookId", "");
         renderShelf();
         return;
       }
-      const chapterId = await RP.db.getSetting("lastChapterId", "");
-      const view = await RP.db.getSetting("lastView", "source");
-      const filter = await RP.db.getSetting("lastFilter", "");
+      const chapterId = await ND.db.getSetting("lastChapterId", "");
+      const view = await ND.db.getSetting("lastView", "source");
+      const filter = await ND.db.getSetting("lastFilter", "");
       applyStoredBook(book, chapterId, view, filter);
       showToast("已恢复上次会话");
     } catch (error) {
@@ -508,8 +513,8 @@
 
   function defaultRules() {
     return {
-      volumePattern: RP.DEFAULT_RULES.volumePattern,
-      chapterPattern: RP.DEFAULT_RULES.chapterPattern,
+      volumePattern: ND.DEFAULT_RULES.volumePattern,
+      chapterPattern: ND.DEFAULT_RULES.chapterPattern,
       extraKeywords: "",
     };
   }
@@ -517,16 +522,16 @@
   function loadRules() {
     const saved = loadJSON(RULES_KEY, {});
     return {
-      volumePattern: saved.volumePattern || RP.DEFAULT_RULES.volumePattern,
-      chapterPattern: saved.chapterPattern || RP.DEFAULT_RULES.chapterPattern,
+      volumePattern: saved.volumePattern || ND.DEFAULT_RULES.volumePattern,
+      chapterPattern: saved.chapterPattern || ND.DEFAULT_RULES.chapterPattern,
       extraKeywords: saved.extraKeywords || "",
     };
   }
 
   function readRules() {
     return {
-      volumePattern: $("volumePatternInput").value.trim() || RP.DEFAULT_RULES.volumePattern,
-      chapterPattern: $("chapterPatternInput").value.trim() || RP.DEFAULT_RULES.chapterPattern,
+      volumePattern: $("volumePatternInput").value.trim() || ND.DEFAULT_RULES.volumePattern,
+      chapterPattern: $("chapterPatternInput").value.trim() || ND.DEFAULT_RULES.chapterPattern,
       extraKeywords: $("extraKeywordsInput").value.trim(),
     };
   }
@@ -575,11 +580,11 @@
 
   function renderSource() {
     const book = state.book;
-    $("statChars").textContent = book ? RP.formatCount(book.stats.chars) : "0";
-    $("statVolumes").textContent = book ? RP.formatCount(book.stats.volumes) : "0";
-    $("statChapters").textContent = book ? RP.formatCount(book.stats.chapters) : "0";
+    $("statChars").textContent = book ? ND.formatCount(book.stats.chars) : "0";
+    $("statVolumes").textContent = book ? ND.formatCount(book.stats.volumes) : "0";
+    $("statChapters").textContent = book ? ND.formatCount(book.stats.chapters) : "0";
     $("statJunk").textContent = book
-      ? RP.formatCount(book.chapters.filter(function (chapter) { return chapter.excluded; }).length)
+      ? ND.formatCount(book.chapters.filter(function (chapter) { return chapter.excluded; }).length)
       : "0";
     $("sourcePreview").value = book ? book.rawText.slice(0, 3000) : "";
     renderSidebar();
@@ -593,8 +598,8 @@
     }
     const excluded = book.chapters.filter(function (chapter) { return chapter.excluded; }).length;
     $("sidebarSummary").innerHTML =
-      "<strong>" + RP.escapeHtml(book.fileName) + "</strong><br />" +
-      book.stats.volumes + " 卷 · " + RP.formatCount(book.stats.chapters) + " 节 · 排除 " + excluded + " 条";
+      "<strong>" + ND.escapeHtml(book.fileName) + "</strong><br />" +
+      book.stats.volumes + " 卷 · " + ND.formatCount(book.stats.chapters) + " 节 · 排除 " + excluded + " 条";
   }
 
   function renderClean() {
@@ -630,10 +635,10 @@
           '<input type="checkbox" data-exclude="' + chapter.id + '"' + (chapter.excluded ? " checked" : "") + " />" +
           '<div class="clean-main">' +
           '<div class="clean-title"><button class="link-button" data-open="' + chapter.id + '">' +
-          RP.escapeHtml(chapter.rawTitle || chapter.title) + "</button>" +
+          ND.escapeHtml(chapter.rawTitle || chapter.title) + "</button>" +
           chapterBadges(chapter) + "</div>" +
-          '<div class="clean-reasons">' + RP.escapeHtml(reasons) + " · " +
-          RP.formatCount((chapter.body || "").length) + " 字</div>" +
+          '<div class="clean-reasons">' + ND.escapeHtml(reasons) + " · " +
+          ND.formatCount((chapter.body || "").length) + " 字</div>" +
           "</div>" +
           '<div class="clean-score">' + (chapter.junkScore || 0) + "</div>" +
           "</div>"
@@ -684,8 +689,8 @@
       html += '<article class="volume' + (collapsed ? " collapsed" : "") + '" data-volume="' + volume.id + '">';
       html += '<div class="volume-head" data-toggle="' + volume.id + '">';
       html += '<span class="volume-arrow">' + (collapsed ? "▸" : "▾") + "</span>";
-      html += '<div class="volume-title"><h3>' + RP.escapeHtml(volume.rawTitle) + "</h3>";
-      html += '<div class="volume-meta">' + chapters.length + " 章 · " + RP.formatCount(chars) + " 字</div></div>";
+      html += '<div class="volume-title"><h3>' + ND.escapeHtml(volume.rawTitle) + "</h3>";
+      html += '<div class="volume-meta">' + chapters.length + " 章 · " + ND.formatCount(chars) + " 字</div></div>";
       html += "</div>";
       html += '<div class="chapter-list">';
 
@@ -694,9 +699,9 @@
         const excluded = chapter.excluded ? " excluded" : "";
         html +=
           '<div class="chapter-row' + active + excluded + '" data-chapter="' + chapter.id + '">' +
-          '<span class="chapter-num">' + RP.escapeHtml(chapterPlaceholder(chapter)) + "</span>" +
-          '<span class="chapter-name">' + RP.escapeHtml(chapter.title || chapter.rawTitle) + "</span>" +
-          '<span class="chapter-meta">' + RP.formatCount((chapter.body || "").length) + " 字 " + chapterBadges(chapter) + "</span>" +
+          '<span class="chapter-num">' + ND.escapeHtml(chapterPlaceholder(chapter)) + "</span>" +
+          '<span class="chapter-name">' + ND.escapeHtml(chapter.title || chapter.rawTitle) + "</span>" +
+          '<span class="chapter-meta">' + ND.formatCount((chapter.body || "").length) + " 字 " + chapterBadges(chapter) + "</span>" +
           "</div>";
       }
 
@@ -746,7 +751,7 @@
       (volume ? volume.rawTitle : "") +
       (chapter.globalIndex != null ? " · 全书第 " + chapter.globalIndex + " 节" : " · " + chapterPlaceholder(chapter)) +
       (chapter.localIndex != null ? " · 卷内第 " + chapter.localIndex + " 节" : "") +
-      " · " + RP.formatCount((chapter.body || "").length) + " 字" +
+      " · " + ND.formatCount((chapter.body || "").length) + " 字" +
       (chapter.excluded ? " · 已排除" : "");
 
     if (document.activeElement !== titleInput) titleInput.value = chapter.title || chapter.rawTitle;
@@ -766,7 +771,7 @@
   function renderExportTargetHint() {
     const node = $("exportTargetHint");
     if (!node) return;
-    const mode = RP.exportTarget.mode();
+    const mode = ND.exportTarget.mode();
     const bookName = state.book ? bookTitle(state.book.fileName) : "<书名>";
     const relative = "export/" + bookName + "/";
 
@@ -799,11 +804,11 @@
       return;
     }
     const options = currentOptions();
-    const counts = RP.countSelection(book, options);
+    const counts = ND.countSelection(book, options);
     $("exportSummary").textContent =
-      "将导出 " + RP.formatCount(counts.total) + " 个章节文件；已排除 " +
-      RP.formatCount(counts.excluded) + " 条；共 " +
-      book.stats.volumes + " 卷 / " + RP.formatCount(book.stats.chapters) + " 节。";
+      "将导出 " + ND.formatCount(counts.total) + " 个章节文件；已排除 " +
+      ND.formatCount(counts.excluded) + " 条；共 " +
+      book.stats.volumes + " 卷 / " + ND.formatCount(book.stats.chapters) + " 节。";
   }
 
   function renderAll() {
@@ -836,7 +841,7 @@
       return;
     }
     try {
-      const result = RP.buildTemplatePreview(state.book, currentOptions(), pluginTemplateValues());
+      const result = ND.buildTemplatePreview(state.book, currentOptions(), pluginTemplateValues());
       if (!result) {
         preview.textContent = "当前没有可导出的内容章节。";
         return;
@@ -854,8 +859,8 @@
     const listNode = $("pluginList");
     if (!statusNode || !listNode) return;
 
-    const status = RP.plugins.status();
-    const plugins = RP.plugins.list();
+    const status = ND.plugins.status();
+    const plugins = ND.plugins.list();
     const errorCount = plugins.filter(function (plugin) { return !!plugin.error; }).length;
 
     if (status.loading) {
@@ -863,7 +868,7 @@
     } else if (!status.indexLoaded && status.indexError) {
       statusNode.innerHTML =
         '<span class="badge danger">清单未加载</span>' +
-        '<span>' + RP.escapeHtml(status.indexError) + "。运行 " +
+        '<span>' + ND.escapeHtml(status.indexError) + "。运行 " +
         "<code>powershell -File tools/build-plugins.ps1</code> 生成清单后点“刷新插件”。</span>";
     } else {
       statusNode.innerHTML =
@@ -871,7 +876,7 @@
         (errorCount
           ? '<span class="badge danger">错误 ' + errorCount + " 个</span>"
           : '<span class="badge">无错误</span>') +
-        '<span>清单：<code>' + RP.escapeHtml(status.manifestPath) + "</code></span>" +
+        '<span>清单：<code>' + ND.escapeHtml(status.manifestPath) + "</code></span>" +
         '<span>已启用 ' + plugins.filter(function (plugin) { return plugin.enabled; }).length + " 个</span>";
     }
 
@@ -894,18 +899,18 @@
           '<article class="plugin-card">' +
           '<div class="plugin-card-head">' +
           "<div>" +
-          "<h3>" + RP.escapeHtml(plugin.name) + badges.join("") + "</h3>" +
-          '<div class="plugin-meta">' + RP.escapeHtml(plugin.id) + " · v" +
-          RP.escapeHtml(plugin.version) + " · priority " + plugin.priority +
-          " · api " + RP.escapeHtml(String(plugin.apiVersion == null ? "?" : plugin.apiVersion)) + "</div>" +
+          "<h3>" + ND.escapeHtml(plugin.name) + badges.join("") + "</h3>" +
+          '<div class="plugin-meta">' + ND.escapeHtml(plugin.id) + " · v" +
+          ND.escapeHtml(plugin.version) + " · priority " + plugin.priority +
+          " · api " + ND.escapeHtml(String(plugin.apiVersion == null ? "?" : plugin.apiVersion)) + "</div>" +
           "</div>" +
           '<label class="plugin-switch"><input type="checkbox" data-plugin-toggle="' +
-          RP.escapeHtml(plugin.id) + '"' + (plugin.enabled ? " checked" : "") + disabled + " /> 启用</label>" +
+          ND.escapeHtml(plugin.id) + '"' + (plugin.enabled ? " checked" : "") + disabled + " /> 启用</label>" +
           "</div>" +
-          '<p class="plugin-desc">' + (RP.escapeHtml(plugin.description) || "无描述") + "</p>" +
+          '<p class="plugin-desc">' + (ND.escapeHtml(plugin.description) || "无描述") + "</p>" +
           '<div class="plugin-hooks">hooks：' +
-          (plugin.hooks.length ? RP.escapeHtml(plugin.hooks.join(", ")) : "无") + "</div>" +
-          (plugin.error ? '<div class="plugin-error">' + RP.escapeHtml(plugin.error) + "</div>" : "") +
+          (plugin.hooks.length ? ND.escapeHtml(plugin.hooks.join(", ")) : "无") + "</div>" +
+          (plugin.error ? '<div class="plugin-error">' + ND.escapeHtml(plugin.error) + "</div>" : "") +
           "</article>"
         );
       })
@@ -914,7 +919,7 @@
     listNode.querySelectorAll("[data-plugin-toggle]").forEach(function (input) {
       input.onchange = function () {
         const id = input.dataset.pluginToggle;
-        if (!RP.plugins.setEnabled(id, input.checked)) {
+        if (!ND.plugins.setEnabled(id, input.checked)) {
           showToast("插件未加载，无法切换");
         } else {
           showToast(input.checked ? "已启用插件：" + id : "已停用插件：" + id);
@@ -930,7 +935,7 @@
     const button = $("pluginRefreshButton");
     button.disabled = true;
     try {
-      await RP.plugins.load();
+      await ND.plugins.load();
       renderPlugins();
       showToast("插件已刷新");
     } catch (error) {
@@ -941,13 +946,13 @@
   }
 
   function saveTemplates() {
-    RP.plugins.setTemplates(pluginTemplateValues());
+    ND.plugins.setTemplates(pluginTemplateValues());
     renderTemplatePreview();
     showToast("导出模板已保存");
   }
 
   function resetTemplates() {
-    applyTemplateInputs(RP.plugins.setTemplates(RP.plugins.defaultTemplates()));
+    applyTemplateInputs(ND.plugins.setTemplates(ND.plugins.defaultTemplates()));
     renderTemplatePreview();
     showToast("已恢复默认导出模板");
   }
@@ -984,9 +989,9 @@
   function rebuildBook(text) {
     const rules = readRules();
     saveRules(rules);
-    const book = RP.splitBook(text, rules);
+    const book = ND.splitBook(text, rules);
     book.fileName = state.fileName;
-    RP.classifyBook(book, { extraKeywords: rules.extraKeywords });
+    ND.classifyBook(book, { extraKeywords: rules.extraKeywords });
     state.book = book;
     const first = firstContentChapter() || book.chapters[0];
     state.selectedId = first ? first.id : "";
@@ -1001,7 +1006,7 @@
 
   function importEntries(entries, source) {
     try {
-      const book = RP.importFromEntries(entries);
+      const book = ND.importFromEntries(entries);
       applyImportedBook(book, source);
     } catch (error) {
       showToast(error.message || "导入失败");
@@ -1045,7 +1050,7 @@
       const buffer = await file.arrayBuffer();
       if (/\.zip$/i.test(file.name)) {
         const entries = [];
-        (await RP.readZip(buffer)).forEach(function (bytes, path) {
+        (await ND.readZip(buffer)).forEach(function (bytes, path) {
           entries.push({ path: path, bytes: bytes });
         });
         importEntries(entries, "zip");
@@ -1062,7 +1067,7 @@
         }
       }
       state.fileName = file.name;
-      const book = rebuildBook(RP.normalizeText(text));
+      const book = rebuildBook(ND.normalizeText(text));
       book.title = bookTitle(book.fileName);
       book.source = "txt";
       showToast("已切分：" + book.stats.volumes + " 卷 / " + book.stats.chapters + " 节，排除 " +
@@ -1182,8 +1187,8 @@
 
   function exportTxt() {
     if (!requireBook()) return;
-    const result = RP.exportPlainText(state.book, currentOptions());
-    RP.downloadBlob(result.fileName, result.blob);
+    const result = ND.exportPlainText(state.book, currentOptions());
+    ND.downloadBlob(result.fileName, result.blob);
     showToast("已导出 " + result.fileName);
   }
 
@@ -1192,8 +1197,8 @@
     showToast("正在打包 ZIP…");
     setTimeout(function () {
       try {
-        const result = RP.exportZip(state.book, currentOptions());
-        RP.downloadBlob(result.fileName, result.blob);
+        const result = ND.exportZip(state.book, currentOptions());
+        ND.downloadBlob(result.fileName, result.blob);
         showToast("已导出 " + result.fileName);
       } catch (error) {
         showToast("打包失败：" + error.message);
@@ -1206,8 +1211,8 @@
     showToast("正在生成 EPUB…");
     setTimeout(function () {
       try {
-        const result = RP.exportEpub(state.book, currentOptions());
-        RP.downloadBlob(result.fileName, result.blob);
+        const result = ND.exportEpub(state.book, currentOptions());
+        ND.downloadBlob(result.fileName, result.blob);
         showToast("已导出 " + result.fileName);
       } catch (error) {
         showToast("生成失败：" + error.message);
@@ -1219,8 +1224,8 @@
     const chapter = selectedChapter();
     if (!chapter) return;
     try {
-      const result = RP.buildChapterFile(state.book, chapter, currentOptions());
-      RP.downloadBlob(
+      const result = ND.buildChapterFile(state.book, chapter, currentOptions());
+      ND.downloadBlob(
         result.fileName,
         new Blob([result.content], { type: "text/plain;charset=utf-8" }),
       );
@@ -1236,21 +1241,21 @@
       showToast("正在检测导出目标，请稍后重试");
       return;
     }
-    if (RP.exportTarget.mode() === "unsupported") {
+    if (ND.exportTarget.mode() === "unsupported") {
       showToast("当前环境不支持写入目录，请用 start.bat 启动或导出 ZIP");
       return;
     }
 
     let plan;
     try {
-      plan = RP.exportFolder(state.book, currentOptions());
+      plan = ND.exportFolder(state.book, currentOptions());
     } catch (error) {
       showToast("导出准备失败：" + ((error && error.message) || "未知错误"));
       return;
     }
 
     try {
-      const result = await RP.exportTarget.save(plan);
+      const result = await ND.exportTarget.save(plan);
       renderExportTargetHint();
       showToast("已写入 " + result.path + "（" + result.count + " 个文件）");
     } catch (error) {
@@ -1284,7 +1289,7 @@
 
   function reclassify() {
     if (!state.book) return;
-    RP.classifyBook(state.book, { extraKeywords: readRules().extraKeywords });
+    ND.classifyBook(state.book, { extraKeywords: readRules().extraKeywords });
     persist.fullDirty = true;
     scheduleSaveFlush();
     renderAll();
@@ -1372,16 +1377,16 @@
     applyRules(loadRules());
     state.options = Object.assign({}, state.options, loadJSON(OPTIONS_KEY, {}));
     applyOptions(state.options);
-    applyTemplateInputs(RP.plugins.templates());
+    applyTemplateInputs(ND.plugins.templates());
     bindEvents();
     renderAll();
     renderSaveStatus();
     renderShelf();
     renderPlugins();
-    RP.plugins.load().then(function () {
+    ND.plugins.load().then(function () {
       renderPlugins();
     });
-    RP.exportTarget
+    ND.exportTarget
       .init()
       .then(function (result) {
         exportTarget.ready = true;

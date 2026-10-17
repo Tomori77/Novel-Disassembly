@@ -108,11 +108,11 @@
 
 v1 扁平变量保留为兼容别名。
 
-## 6. manifest（`rp-disassembly/1`）
+## 6. manifest（`novel-disassembly/1`）
 
 ```json
 {
-  "format": "rp-disassembly/1",
+  "format": "novel-disassembly/1",
   "book": "书名",
   "exportedAt": "2026-10-17T12:00:00.000Z",
   "options": { "includeExcluded": false, "includeNotes": true, "useEditedTitles": true, "cleanWatermark": true, "cleanTrailingNotes": true },
@@ -144,6 +144,7 @@ v1 扁平变量保留为兼容别名。
 约定：
 
 - 只记录实际写出的章节；未勾选“包含已排除章节”时，排除项不进 manifest。
+- 新版写出 `novel-disassembly/1`；导入同时接受 `novel-disassembly/1` 与旧的 `rp-disassembly/1`。
 - 章节文件格式 `标题\n\n正文`；回读时首行等于标题则剥离。
 - 回读忽略未知字段，便于后续扩展。
 - 回读是**清洗后的文本**，不等同原始素材。
@@ -185,7 +186,7 @@ v1 扁平变量保留为兼容别名。
 
 ```json
 {
-  "schema": "rp-disassembly/book/1",
+  "schema": "novel-disassembly/book/1",
   "book": { "title", "fileName", "stats" },
   "volumes": [{ "number", "title", "chapters": [{ "title", "type", "globalIndex", "body" }] }],
   "entities": [],

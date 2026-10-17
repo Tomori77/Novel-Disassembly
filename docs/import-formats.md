@@ -11,7 +11,7 @@
 
 ### ZIP
 
-- `RP.readZip` 解析中央目录（支持 store 与 deflate）
+- `ND.readZip` 解析中央目录（支持 store 与 deflate）
 - 有 `_manifest.json`：按 manifest 精确还原卷、标题、编号、类型、排除状态
 - 无 manifest：按目录结构推断（共同顶层目录为书名、一级子目录为卷、`NN_名称` 转卷号、文件名前缀排序）
 - 缺失文件跳过并提示数量
@@ -29,7 +29,7 @@
 
 ### EPUB
 
-1. `RP.readZip` 读取
+1. `ND.readZip` 读取
 2. 解析 `META-INF/container.xml` → OPF 路径
 3. 解析 OPF：metadata（title）、manifest、spine 顺序
 4. 逐章读取 XHTML，剥离 `script/style`，提取标题与段落
@@ -38,7 +38,7 @@
 
 ### DOCX
 
-1. `RP.readZip` 读取
+1. `ND.readZip` 读取
 2. 解析 `word/document.xml`
 3. 遍历 `w:p`：读取 `w:pStyle`（`Heading1`/`Heading2`/`Title`）与 `w:t` 文本
 4. 处理 `w:br`（换行）、`w:tab`（制表符）
