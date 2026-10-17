@@ -151,6 +151,7 @@
       enabled: !!record.enabled,
       error: record.error || "",
       hooks: record.hooks.slice(),
+      viewCount: record.views.length,
       description: record.description || "",
       compatible: !!record.compatible,
       registered: !!record.registered,
@@ -173,6 +174,7 @@
       registered: false,
       def: null,
       hooks: [],
+      views: [],
       compatible: apiVersion === API_VERSION,
       error: "",
       order: order,
@@ -248,12 +250,83 @@
         return typeof hooks[name] === "function";
       });
       if (!record.compatible) record.hooks = [];
+
+      record.views = [];
+      const ui = def.ui && typeof def.ui === "object" ? def.ui : {};
+      const viewDefs = Array.isArray(ui.views) ? ui.views : [];
+      const seenViews = Object.create(null);
+      viewDefs.forEach(function (view, index) {
+        if (!view || typeof view !== "object") {
+          appendError(record, "ui.views[" + index + "] 不是对象，已忽略");
+          return;
+        }
+        const viewId = String(view.id == null ? "" : view.id).trim();
+        if (!viewId) {
+          appendError(record, "ui.views[" + index + "] 缺少 id，已忽略");
+          return;
+        }
+        if (typeof view.mount !== "function") {
+          appendError(record, "ui.views." + viewId + " 的 mount 不是函数，已忽略");
+          return;
+        }
+        if (seenViews[viewId]) {
+          appendError(record, "ui.views 存在重复 id：" + viewId + "，已忽略后一项");
+          return;
+        }
+        seenViews[viewId] = true;
+        record.views.push({
+          pluginId: record.id,
+          id: viewId,
+          label: String(view.label == null || view.label === "" ? viewId : view.label),
+          mount: view.mount,
+          onShow: typeof view.onShow === "function" ? view.onShow : null,
+        });
+      });
+      if (!record.compatible) record.views = [];
+
       record.enabled = computeEnabled(record);
       return listItem(record);
     },
 
     list: function () {
       return sortedRecords().map(listItem);
+    },
+
+    // 已启用 + 兼容 + 已注册插件的视图；顺序为 priority 升序、注册顺序。
+    views: function () {
+      const result = [];
+      activeRecords().forEach(function (record) {
+        (record.views || []).forEach(function (view) {
+          result.push({
+            pluginId: view.pluginId,
+            id: view.id,
+            label: view.label,
+            mount: view.mount,
+            onShow: view.onShow,
+          });
+        });
+      });
+      return result;
+    },
+
+    // 插件独立存储：绑定 pluginId，返回的 API 无法访问其它插件的数据。
+    storage: function (pluginId) {
+      const id = String(pluginId == null ? "" : pluginId).trim();
+      if (!id) throw new Error("插件存储不可用：缺少插件 ID");
+      return {
+        get: function (key, fallback) {
+          return ND.db.pluginGet(id, key, fallback);
+        },
+        set: function (key, value) {
+          return ND.db.pluginSet(id, key, value);
+        },
+        remove: function (key) {
+          return ND.db.pluginDelete(id, key);
+        },
+        list: function () {
+          return ND.db.pluginList(id);
+        },
+      };
     },
 
     load: function () {

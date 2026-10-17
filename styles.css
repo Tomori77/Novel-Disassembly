@@ -746,6 +746,11 @@ body.selecting {
   margin-top: 4px;
 }
 
+.plugin-view {
+  min-width: 0;
+  min-height: 160px;
+}
+
 .plugin-status {
   display: flex;
   flex-wrap: wrap;
@@ -1005,7 +1010,7 @@ body.selecting {
   }
 
   .nav {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
   }
 
   .nav button {
@@ -1047,7 +1052,7 @@ body.selecting {
 
 @media (max-width: 640px) {
   .nav {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
   }
 
   .plugin-card-head {

@@ -177,8 +177,9 @@ v1 扁平变量保留为兼容别名。
 | `volumes` | `[bookId, id]` | 卷字段、`order` |
 | `chapters` | `[bookId, id]` | 章节全部字段、`order` |
 | `settings` | `key` | 上次书/章节/视图/筛选、导出目录句柄 |
+| `pluginData` | `[pluginId, key]` | 插件独立键值数据；索引 `pluginId` |
 
-插件数据（v2）建议使用独立命名空间键，例如 `plugin:<id>:<key>`，不写入核心表。
+`pluginData` 于数据库 v2 新增，主键保证不同插件（甚至同名 key）互不覆盖，索引用于按 `pluginId` 整批读取/清理。访问入口为 `ND.db.pluginGet / pluginSet / pluginDelete / pluginList / pluginClear` 与 `ND.plugins.storage(pluginId)`，全部返回 Promise。书架“清空书架”会一并清空该仓库。v1 → v2 升级只新增这一个 store，不重建或清空已有书籍数据。
 
 ## 9. JSON 导出（计划）
 

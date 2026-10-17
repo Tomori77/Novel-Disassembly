@@ -99,7 +99,8 @@
 3. 加载器插入 `plugins/index.js`，优先读取 `window.ND_PLUGIN_INDEX`，缺失时回退到旧的 `window.RP_PLUGIN_INDEX`（加载前两者都会清空）。
 4. 按 `priority` 升序（同优先级按清单顺序）依次插入插件入口脚本。
 5. 插件脚本调用 `ND.plugins.register(def)`。
-6. 每次导出时：
+6. 加载完成后，宿主把已启用插件的 `ui.views` 渲染成侧栏导航与视图容器（见第 5 节）。
+7. 每次导出时：
    - 构造词条；
    - 按 `priority` 升序执行所有已启用、兼容、已注册插件的 `normalizeEntry`；
    - 计算默认变量；
@@ -152,7 +153,180 @@ return { cleanTitle: entry.chapter.title };
 
 ---
 
-## 5. 默认变量
+## 5. UI 视图
+
+插件可以在侧栏注册一个或多个视图。宿主在 `.nav` 末尾追加导航按钮，在 `.content` 末尾追加对应的 `<section class="view">`，延迟到第一次显示时才调用 `mount`。
+
+```js
+ND.plugins.register({
+  id: "ai-analysis",
+  name: "AI 分析",
+  version: "0.1.0",
+  apiVersion: 1,
+  priority: 100,
+  ui: {
+    views: [
+      {
+        id: "ai",              // 插件内唯一
+        label: "AI 分析",       // 侧栏文字
+        mount: function (el, ctx) {
+          // 首次显示时调用一次；el 是空的 <div class="panel plugin-view">
+          el.textContent = "尚未分析";
+          var book = ctx.getBook();
+          if (book) el.textContent = "当前书：" + book.title;
+        },
+        onShow: function (ctx) {
+          // 可选；之后每次切换到该视图都会调用
+        },
+      },
+    ],
+  },
+});
+```
+
+约束与行为：
+
+- `id` 必须是非空字符串且在插件内唯一；`mount` 必须是函数。无效视图会被忽略，原因写进 `list()` 的 `error`，不影响该插件的其它视图与钩子。
+- 只有**已启用、兼容、已注册**的插件视图会出现；顺序为 `priority` 升序，同优先级按注册顺序。
+- 视图标识（`data-view`）固定为 `plugin:<pluginId>:<viewId>`。
+- `mount` 可以返回 Promise；同步抛错或 Promise 拒绝时，面板显示“插件视图加载失败：…”并弹出 toast，其它视图不受影响。
+- 刷新插件（`ND.plugins.load()`）或停用插件后，宿主会移除动态导航与视图并重建；若当前正停在被移除的插件视图上，自动回到“插件”页。
+
+`ND.plugins.views()` 返回扁平数组：
+
+```js
+[{
+  pluginId: "ai-analysis",
+  id: "ai",
+  label: "AI 分析",
+  mount: function (el, ctx) {},
+  onShow: function (ctx) {}   // 未提供时为 null
+}]
+```
+
+`mount(el, ctx)` / `onShow(ctx)` 的 `ctx`：
+
+| 字段 | 说明 |
+|---|---|
+| `pluginId` | 当前插件 id |
+| `getBook()` | 返回宿主当前书对象（`state.book`），未导入时为 `null` |
+| `getSelectedChapter()` | 返回当前选中章节对象，未选中时为 `undefined` |
+| `toast(message)` | 复用宿主 toast，2.8 秒后消失 |
+| `switchView(name)` | 切换视图；传入 `"reader"`、`"plugins"` 或 `plugin:<id>:<view>` 等 |
+| `refresh()` | 重新渲染宿主界面（`renderAll`），不重建插件视图 |
+| `storage` | 当前插件的独立存储，见下一节 |
+
+示例：在 `mount` 中读取当前书并写入自己的数据。
+
+```js
+mount: function (el, ctx) {
+  var book = ctx.getBook();
+  var title = book ? book.title : "未导入";
+  el.innerHTML = "";
+  var heading = document.createElement("h3");
+  heading.textContent = "AI 分析";
+  var line = document.createElement("p");
+  line.textContent = "当前书：" + title;
+  el.appendChild(heading);
+  el.appendChild(line);
+
+  ctx.storage.set("lastOpenedBook", book ? book.id : null).catch(function (error) {
+    ctx.toast(error.message);
+  });
+}
+```
+
+> 插件视图拥有页面 DOM 权限，渲染用户文本时请自行转义或使用 `textContent`。
+
+---
+
+## 6. 插件存储
+
+插件数据存放在 IndexedDB 的 `pluginData` 对象仓库，主键为 `[pluginId, key]`，并带有 `pluginId` 索引。通过 `ND.plugins.storage(自己的 id)` 访问时，不同插件互不可见；同名 key 也不会互相覆盖。
+
+```js
+const storage = ND.plugins.storage("ai-analysis");
+
+await storage.set("config", { model: "local", temperature: 0.2 });
+const config = await storage.get("config", {});   // 缺失时返回 fallback
+const all = await storage.list();                 // { key: value }
+await storage.remove("config");
+```
+
+| 方法 | 返回 | 说明 |
+|---|---|---|
+| `get(key, fallback)` | `Promise<any>` | 缺失时解析为 `fallback` |
+| `set(key, value)` | `Promise<value>` | 值需可结构化克隆（对象、数组、字符串、数字、布尔、Blob 等） |
+| `remove(key)` | `Promise<void>` | 删除单个键 |
+| `list()` | `Promise<object>` | 当前插件的全部键值对 |
+
+宿主级 API 等价于：
+
+```js
+ND.db.pluginGet(pluginId, key, fallback)
+ND.db.pluginSet(pluginId, key, value)
+ND.db.pluginDelete(pluginId, key)
+ND.db.pluginList(pluginId)
+ND.db.pluginClear(pluginId)      // 清理该插件全部数据
+```
+
+说明：
+
+- 书架“清空书架”会连同 `pluginData` 一起清空。
+- 若页面运行在旧库降级模式（`ND.db.isLegacy() === true`）且尚未完成 v2 升级，`pluginData` 不存在，以上 API 会抛出中文错误（如“插件存储不可用：当前处于旧数据库降级模式…”）。插件应捕获并在视图中提示。
+- `storage()` 返回的对象已绑定插件 id，无法改指其它插件；底层 `ND.db.plugin*` 需要显式传入 pluginId，插件应只传自己的 id，不要读取或清理其它插件的数据。
+
+---
+
+## 7. 事件
+
+宿主在状态变化后向 `window` 派发自定义事件，插件可监听并刷新自己的视图。
+
+```js
+window.addEventListener("nd:book-changed", function (event) {
+  var book = event.detail.book;   // 未导入 / 删除当前书 / 清空书架时为 null
+  // 例如重新渲染当前插件视图
+});
+
+window.addEventListener("nd:chapter-changed", function (event) {
+  var chapter = event.detail.chapter;   // 当前选中章节对象
+});
+```
+
+| 事件 | `detail` | 触发时机 |
+|---|---|---|
+| `nd:book-changed` | `{ book }` | 导入、重新切分、从书架打开、恢复会话、删除当前书、清空书架（`book: null`） |
+| `nd:chapter-changed` | `{ chapter }` | 选择章节后（目录、清洗预览跳转、上一章/下一章） |
+
+示例：监听书籍变化，更新面板内容。
+
+```js
+ND.plugins.register({
+  id: "ai-analysis",
+  apiVersion: 1,
+  ui: {
+    views: [{
+      id: "ai",
+      label: "AI 分析",
+      mount: function (el, ctx) {
+        function render() {
+          var book = ctx.getBook();
+          el.textContent = book ? "当前书：" + book.title : "请先导入一本书";
+        }
+        render();
+        window.addEventListener("nd:book-changed", render);
+        window.addEventListener("nd:chapter-changed", render);
+      },
+    }],
+  },
+});
+```
+
+> 视图被刷新重建后，旧 DOM 与监听器可能仍在内存中；在 `mount` 里注册的监听器建议使用具名函数，并在不需要时自行移除。宿主目前不提供 `unmount` 钩子。
+
+---
+
+## 8. 默认变量
 
 | 变量 | 说明 |
 |---|---|
@@ -173,7 +347,7 @@ return { cleanTitle: entry.chapter.title };
 
 ---
 
-## 6. 模板语法
+## 9. 模板语法
 
 ```text
 {{变量名}}
@@ -229,7 +403,7 @@ ND.plugins.defaultTemplates();
 
 ---
 
-## 7. 错误处理
+## 10. 错误处理
 
 - 插件脚本加载失败：记录到 `list()` 的 `error`，其他插件继续。
 - `apiVersion !== 1`：标记不兼容，不加载钩子，插件页显示“不兼容”。
@@ -241,18 +415,20 @@ ND.plugins.defaultTemplates();
 
 ---
 
-## 8. 安全边界
+## 11. 安全边界
 
 - 插件是本地 JavaScript，运行在页面权限内，可以读取已导入的文本、修改导出内容、访问页面可访问的浏览器 API。
 - 只启用你信任的插件。
 - 插件不能联网安装；没有远程市场或自动下载。
 - 插件不能绕过浏览器的同源策略、文件系统权限或下载限制。
 - 导出路径做了分段安全化，避免 `..`、绝对路径和 Windows 非法字符。
-- 插件开关与模板存放在 localStorage；键名分别为 `novel-disassembly-plugin-state-v1` 与 `novel-disassembly-templates-v1`，不涉及 IndexedDB 或本地服务器。旧键 `rp-disassembly-*` 会在启动时复制到新键，旧键保留。
+- 插件开关与模板存放在 localStorage；键名分别为 `novel-disassembly-plugin-state-v1` 与 `novel-disassembly-templates-v1`，不涉及本地服务器。旧键 `rp-disassembly-*` 会在启动时复制到新键，旧键保留。
+- 插件自有数据由宿主写入 IndexedDB `novel-disassembly` 的 `pluginData` 仓库，主键 `[pluginId, key]`；插件只能通过 `ND.plugins.storage(自己的 id)` 访问。
+- 插件视图运行在宿主页面内，可以操作页面 DOM；请使用 `textContent` 或自行转义后再写入 `innerHTML`。
 
 ---
 
-## 9. 目录规范
+## 12. 目录规范
 
 ```text
 plugins/
@@ -314,7 +490,7 @@ window.ND_PLUGIN_INDEX = [
 
 ---
 
-## 10. 新增插件
+## 13. 新增插件
 
 1. 复制 `plugins/_template` 为 `plugins/<你的 id>`。
 2. 修改 `plugin.json` 的 `id`、`name`、`version`、`description`。
@@ -325,7 +501,7 @@ window.ND_PLUGIN_INDEX = [
 
 ---
 
-## 11. 版本兼容
+## 14. 版本兼容
 
 - 当前 API 版本为 `1`。
 - 全局入口为 `window.ND`；`window.RP` 是永久兼容别名，旧插件继续工作。
@@ -336,20 +512,24 @@ window.ND_PLUGIN_INDEX = [
 
 ---
 
-## 12. 后续规划
+## 15. 后续规划
 
 - `beforeExport`：全书级预处理（统一书名、卷名、全局替换）。
 - `exporters`：插件注册新的导出格式。
+- `importers`：注册新的导入格式。
 - `afterImport`：从 ZIP / 文件夹回读后做规范化。
-- IndexedDB 持久化与本地插件服务器由后续任务实现，不属于 API 1。
+- 视图卸载钩子（`unmount`）与更多固定插槽（阅读侧栏、导出格式区）。
+- UI 视图与插件存储已在 API 1 内实现；本地插件服务器仍不在范围内。
 
 ---
 
-## 13. 运行时 API 摘要
+## 16. 运行时 API 摘要
 
 ```js
-ND.plugins.register(def)          // 注册插件
-ND.plugins.list()                 // [{id,name,version,priority,enabled,error,hooks,description,...}]
+ND.plugins.register(def)          // 注册插件（可含 ui.views）
+ND.plugins.list()                 // [{id,name,version,priority,enabled,error,hooks,viewCount,description,...}]
+ND.plugins.views()                // [{pluginId,id,label,mount,onShow}]
+ND.plugins.storage(pluginId)      // {get,set,remove,list}，全部返回 Promise
 ND.plugins.load()                 // Promise，加载清单与插件脚本
 ND.plugins.normalize(entry, ctx)  // 依次执行 normalizeEntry
 ND.plugins.variables(entry, ctx)  // 默认变量 + defineVariables

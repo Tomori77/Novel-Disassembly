@@ -41,6 +41,8 @@
     ready: false,
     result: null,
   };
+  // key: "plugin:<pluginId>:<viewId>" → { view, panel, ctx, mounted }
+  let pluginViewRegistry = Object.create(null);
   const persist = {
     available: true,
     ready: false,
@@ -62,6 +64,22 @@
     showToast.timer = setTimeout(function () {
       toast.classList.remove("show");
     }, 2800);
+  }
+
+  function isPluginView(viewName) {
+    return typeof viewName === "string" && viewName.indexOf("plugin:") === 0;
+  }
+
+  function notifyBookChanged() {
+    window.dispatchEvent(
+      new CustomEvent("nd:book-changed", { detail: { book: state.book } }),
+    );
+  }
+
+  function notifyChapterChanged() {
+    window.dispatchEvent(
+      new CustomEvent("nd:chapter-changed", { detail: { chapter: selectedChapter() } }),
+    );
   }
 
   function loadJSON(key, fallback) {
@@ -104,6 +122,8 @@
   }
 
   function validView(name) {
+    // 插件视图在插件加载完成后才存在；switchView 会在缺失时回退到插件页。
+    if (isPluginView(name)) return name;
     const allowed = ["source", "clean", "toc", "reader", "export", "plugins"];
     return allowed.indexOf(name) === -1 ? "source" : name;
   }
@@ -388,6 +408,7 @@
     renderAll();
     switchView(validView(view));
     renderShelf();
+    notifyBookChanged();
     scheduleSettingsSave();
   }
 
@@ -478,6 +499,7 @@
     state.collapsed = new Set();
     if ($("tocFilter")) $("tocFilter").value = "";
     renderAll();
+    notifyBookChanged();
   }
 
   async function restoreSession() {
@@ -1121,6 +1143,124 @@
     }
   }
 
+  function pluginViewKey(pluginId, viewId) {
+    return "plugin:" + pluginId + ":" + viewId;
+  }
+
+  function pluginContext(view) {
+    return {
+      pluginId: view.pluginId,
+      getBook: function () {
+        return state.book;
+      },
+      getSelectedChapter: function () {
+        return selectedChapter();
+      },
+      toast: showToast,
+      switchView: switchView,
+      refresh: renderAll,
+      storage: ND.plugins.storage(view.pluginId),
+    };
+  }
+
+  function renderPluginViewError(entry, message) {
+    const text = String(message || "未知错误");
+    entry.panel.innerHTML = "";
+    const node = document.createElement("p");
+    node.className = "plugin-error";
+    node.textContent = "插件视图加载失败：" + text;
+    entry.panel.appendChild(node);
+    showToast("插件视图加载失败：" + text);
+  }
+
+  function showPluginView(key) {
+    const entry = pluginViewRegistry[key];
+    if (!entry) return;
+
+    if (!entry.mounted) {
+      entry.mounted = true;
+      try {
+        const result = entry.view.mount(entry.panel, entry.ctx);
+        // mount 允许返回 Promise；异步失败同样落到面板与 toast。
+        if (result && typeof result.then === "function") {
+          result.catch(function (error) {
+            renderPluginViewError(entry, error && error.message ? error.message : String(error));
+          });
+        }
+      } catch (error) {
+        renderPluginViewError(entry, error && error.message ? error.message : String(error));
+      }
+      return;
+    }
+
+    if (typeof entry.view.onShow === "function") {
+      try {
+        const result = entry.view.onShow(entry.ctx);
+        if (result && typeof result.then === "function") {
+          result.catch(function (error) {
+            showToast(
+              "插件视图刷新失败：" + (error && error.message ? error.message : String(error)),
+            );
+          });
+        }
+      } catch (error) {
+        showToast(
+          "插件视图刷新失败：" + (error && error.message ? error.message : String(error)),
+        );
+      }
+    }
+  }
+
+  // 每次插件加载/开关变化后重建动态导航与视图容器。
+  function renderPluginViews() {
+    const nav = document.querySelector(".nav");
+    const content = document.querySelector(".content");
+    if (!nav || !content) return;
+
+    document.querySelectorAll('[data-plugin-view="1"]').forEach(function (node) {
+      node.remove();
+    });
+
+    const previous = state.view;
+    pluginViewRegistry = Object.create(null);
+
+    ND.plugins.views().forEach(function (view) {
+      const key = pluginViewKey(view.pluginId, view.id);
+
+      const button = document.createElement("button");
+      button.setAttribute("data-plugin-view", "1");
+      button.dataset.view = key;
+      button.textContent = view.label;
+      button.onclick = function () {
+        switchView(key);
+      };
+      nav.appendChild(button);
+
+      const section = document.createElement("section");
+      section.className = "view";
+      section.setAttribute("data-plugin-view", "1");
+      section.dataset.view = key;
+      const panel = document.createElement("div");
+      panel.className = "panel plugin-view";
+      section.appendChild(panel);
+      content.appendChild(section);
+
+      pluginViewRegistry[key] = {
+        view: view,
+        panel: panel,
+        ctx: null,
+        mounted: false,
+      };
+      pluginViewRegistry[key].ctx = pluginContext(view);
+    });
+
+    if (isPluginView(previous)) {
+      // 视图还在就重新激活；插件被停用/移除时回到插件页。
+      if (pluginViewRegistry[previous]) switchView(previous);
+      else switchView("plugins");
+    }
+  }
+
   function renderPlugins() {
     const statusNode = $("pluginStatus");
     const listNode = $("pluginList");
@@ -1192,6 +1332,7 @@
           showToast(input.checked ? "已启用插件：" + id : "已停用插件：" + id);
         }
         renderPlugins();
+        renderPluginViews();
       };
     });
 
@@ -1204,6 +1345,7 @@
     try {
       await ND.plugins.load();
       renderPlugins();
+      renderPluginViews();
       showToast("插件已刷新");
     } catch (error) {
       showToast("插件加载失败：" + ((error && error.message) || "未知错误"));
@@ -1225,16 +1367,27 @@
   }
 
   function switchView(viewName) {
-    state.view = viewName;
+    const name = typeof viewName === "string" ? viewName : "source";
+    if (isPluginView(name) && !pluginViewRegistry[name]) {
+      // 插件已停用/刷新且视图不存在：回到插件页。
+      state.view = "plugins";
+      switchView("plugins");
+      return;
+    }
+    state.view = name;
     document.querySelectorAll(".view").forEach(function (view) {
-      view.classList.toggle("active", view.dataset.view === viewName);
+      view.classList.toggle("active", view.dataset.view === name);
     });
     document.querySelectorAll(".nav button").forEach(function (button) {
-      button.classList.toggle("active", button.dataset.view === viewName);
+      button.classList.toggle("active", button.dataset.view === name);
     });
-    if (viewName === "reader") renderReader();
-    if (viewName === "export") renderExportSummary();
-    if (viewName === "plugins") renderPlugins();
+    if (isPluginView(name)) {
+      showPluginView(name);
+    } else {
+      if (name === "reader") renderReader();
+      if (name === "export") renderExportSummary();
+      if (name === "plugins") renderPlugins();
+    }
     scheduleSettingsSave();
   }
 
@@ -1243,6 +1396,7 @@
     switchView("reader");
     renderReader();
     renderToc();
+    notifyChapterChanged();
     scheduleSettingsSave();
   }
 
@@ -1300,6 +1454,7 @@
       if (first) state.collapsed.delete(first.volumeId);
     }
     renderAll();
+    notifyBookChanged();
 
     const excluded = book.chapters.filter(function (chapter) { return chapter.excluded; }).length;
     let message =
@@ -1339,6 +1494,7 @@
       const book = rebuildBook(ND.normalizeText(text));
       book.title = bookTitle(book.fileName);
       book.source = "txt";
+      notifyBookChanged();
       showToast("已切分：" + book.stats.volumes + " 卷 / " + book.stats.chapters + " 节，排除 " +
         book.chapters.filter(function (chapter) { return chapter.excluded; }).length + " 条");
       persistImportedBook(book, "txt");
@@ -1390,6 +1546,7 @@
       book.source = previous.source || "txt";
       state.book = book;
       renderAll();
+      notifyBookChanged();
       showToast("已重新切分：" + book.stats.volumes + " 卷 / " + book.stats.chapters + " 节");
       persistImportedBook(book, book.source);
     } catch (error) {
@@ -1698,8 +1855,10 @@
     renderSaveStatus();
     renderShelf();
     renderPlugins();
+    renderPluginViews();
     ND.plugins.load().then(function () {
       renderPlugins();
+      renderPluginViews();
     });
     ND.exportTarget
       .init()

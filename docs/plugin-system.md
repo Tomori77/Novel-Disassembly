@@ -4,7 +4,7 @@
 
 - 核心保持“拆解 + 宿主 + I/O + 壳”，格式、分析、清洗规则通过插件扩展。
 - 插件默认是本地经典脚本，兼容 `file://`，不联网安装。
-- v1 已上线并保持兼容；v2 增加导入/导出/UI/存储/实体能力。
+- v1 已上线并保持兼容；v2 规划导入/导出/UI/存储/实体能力。当前已实现 **UI 视图**与**插件独立存储**，`importers` / `exporters` 仍未实现。
 
 当前完整 API 参考：[`plugins/API.md`](../plugins/API.md)。插件化拆分路线：[`plugins/ARCHITECTURE.md`](../plugins/ARCHITECTURE.md)。
 
@@ -77,9 +77,11 @@ plugins/
 - 插件在章节收集之后运行，不能改变本轮导出的章节集合，只能规范化词条。
 - 插件加载是异步的；加载完成前立即导出不会包含插件。
 
-## 3. v2（设计）
+## 3. v2（部分实现）
 
 ### 3.1 能力声明
+
+> 本节其余能力（`importers`、`exporters`、`classifiers`、`lifecycle` 等）仍为设计，API 1 宿主不会调用。已落地的是 `ui.views` 与 `ND.plugins.storage()`。
 
 插件在 manifest 中声明 `provides` 与能力：
 
@@ -101,7 +103,9 @@ plugins/
 | `ui` | slot + context | 界面 |
 | `lifecycle` | context | 书加载/切分/导出前后 |
 
-### 3.2 导出插件
+### 3.2 导出插件（未实现）
+
+以下 `exporters` 形式尚未进入 API 1，宿主不会调用：
 
 ```js
 ND.plugins.register({
@@ -121,7 +125,7 @@ ND.plugins.register({
 
 `plan` 由核心生成，包含：书、卷、章节、变量、排除规则、模板、manifest。导出插件不重新实现切分与命名。
 
-### 3.3 导入插件
+### 3.3 导入插件（未实现）
 
 ```js
 {
@@ -135,30 +139,40 @@ ND.plugins.register({
 
 导入插件负责把外部格式转成 v2 词条；核心负责落库、书架、后续清洗与导出。
 
-### 3.4 UI 插槽
+### 3.4 UI 视图（已实现）
 
 ```js
 ui: {
-  views: [{ id: "search", label: "搜索", mount(el, ctx) {} }],
-  panels: [{ slot: "reader.side", mount(el, ctx) {} }],
-  actions: [{ slot: "export.formats", label: "Markdown", run(ctx) {} }],
-  settings: [{ id: "ai", label: "AI", mount(el, ctx) {} }]
+  views: [{
+    id: "ai",
+    label: "AI 分析",
+    mount(el, ctx) { /* 首次显示 */ },
+    onShow(ctx) { /* 之后每次切换显示 */ }
+  }]
 }
 ```
 
-- 只暴露固定 slot（侧栏视图、阅读侧栏、导出格式区、设置页），不提供任意 DOM 替换。
-- 插件仍拥有页面权限，只启用可信代码。
+- 宿主在侧栏 `.nav` 追加入口，在 `.content` 追加 `<section class="view">`；视图 key 为 `plugin:<pluginId>:<viewId>`。
+- `ND.plugins.views()` 只返回已启用、兼容、已注册插件的视图，按 `priority` 升序、注册顺序排列。
+- `mount` 异常显示在面板内并 toast，不影响核心视图与其它插件。
+- 刷新插件、停用插件后动态导航与视图会重建；当前视图被移除时回到插件页。
+- `ctx` 提供 `pluginId`、`getBook()`、`getSelectedChapter()`、`toast()`、`switchView()`、`refresh()`、`storage`。
+- 阅读侧栏、导出格式区、设置页等其它插槽仍为设计，尚未实现。
 
-### 3.5 插件存储
+### 3.5 插件存储（已实现）
 
 ```js
-const store = ND.core.store("ai-analysis");
-await store.set("config", {...});
-await store.get("config", null);
+const store = ND.plugins.storage("ai-analysis");
+await store.set("config", { model: "local" });
+const config = await store.get("config", null);
+await store.remove("config");
+const all = await store.list();   // { key: value }
 ```
 
-- 键前缀 `plugin:<id>:`，与核心表隔离。
-- 可存配置、摘要、实体、任务进度；清除插件时一并清理。
+- 底层为 IndexedDB `pluginData` 仓库，主键 `[pluginId, key]`，索引 `pluginId`；不同插件互不可见。
+- 对应底层 API：`ND.db.pluginGet / pluginSet / pluginDelete / pluginList / pluginClear`，全部返回 Promise。
+- 书架“清空书架”会连同 `pluginData` 一起清空。
+- 旧库降级模式（`ND.db.isLegacy()`）下 `pluginData` 可能不存在，API 抛出中文错误，由插件视图提示。
 
 ### 3.6 变量目录
 

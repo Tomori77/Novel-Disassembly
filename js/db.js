@@ -6,8 +6,9 @@
 
   const DB_NAME = "novel-disassembly";
   const LEGACY_DB_NAME = "rp-disassembly";
-  const DB_VERSION = 1;
-  const STORES = ["books", "sources", "volumes", "chapters", "settings"];
+  const DB_VERSION = 2;
+  const STORES = ["books", "sources", "volumes", "chapters", "settings", "pluginData"];
+  const PLUGIN_STORE = "pluginData";
   const SOURCE_TYPES = { txt: true, zip: true, folder: true };
   const OPEN_TIMEOUT = 3000;
 
@@ -176,6 +177,11 @@
     }
     if (!db.objectStoreNames.contains("settings")) {
       db.createObjectStore("settings", { keyPath: "key" });
+    }
+    // v2 只新增 store；已存在的 books/sources/volumes/chapters/settings 原样保留。
+    if (!db.objectStoreNames.contains(PLUGIN_STORE)) {
+      const pluginData = db.createObjectStore(PLUGIN_STORE, { keyPath: ["pluginId", "key"] });
+      pluginData.createIndex("pluginId", "pluginId", { unique: false });
     }
   }
 
@@ -573,6 +579,40 @@
     });
   }
 
+  function pluginRange(pluginId) {
+    return IDBKeyRange.bound([String(pluginId)], [String(pluginId), []]);
+  }
+
+  function pluginIdOf(value, action) {
+    const id = String(value == null ? "" : value).trim();
+    if (!id) throw new Error(action + "：缺少插件 ID");
+    return id;
+  }
+
+  function pluginKeyOf(value, action) {
+    if (value == null || String(value) === "") throw new Error(action + "：缺少键名");
+    return String(value);
+  }
+
+  // 旧库降级模式下没有 pluginData，事务会直接抛错；这里给出明确的中文提示。
+  function pluginRun(mode, action, work) {
+    return ND.db
+      .open()
+      .then(function (db) {
+        if (!db.objectStoreNames.contains(PLUGIN_STORE)) {
+          throw new Error(
+            "插件存储不可用：当前处于旧数据库降级模式，pluginData 尚未创建；请刷新页面完成 v2 升级后重试",
+          );
+        }
+        return run([PLUGIN_STORE], mode, work);
+      })
+      .catch(function (error) {
+        const detail = errorText(error);
+        if (detail.indexOf(action) === 0) throw new Error(detail);
+        throw new Error(action + (detail ? "：" + detail : ""));
+      });
+  }
+
   function reconstruct(record, sourceRecord, volumeRecords, chapterRecords) {
     const rawText = String((sourceRecord && sourceRecord.rawText) || "");
 
@@ -852,9 +892,16 @@
     clearAll: function () {
       return Promise.resolve()
         .then(function () {
-          return run(STORES, "readwrite", function (tx) {
-            STORES.forEach(function (name) {
-              tx.objectStore(name).clear();
+          // 降级模式连的是旧库，可能没有 pluginData；只清理实际存在的 store。
+          return ND.db.open().then(function (db) {
+            const names = STORES.filter(function (name) {
+              return db.objectStoreNames.contains(name);
+            });
+            if (!names.length) return null;
+            return run(names, "readwrite", function (tx) {
+              names.forEach(function (name) {
+                tx.objectStore(name).clear();
+              });
             });
           });
         })
@@ -893,6 +940,95 @@
         .catch(function (error) {
           throw error instanceof Error ? error : makeError("保存设置失败", error);
         });
+    },
+
+    // ---- 插件独立存储：主键 [pluginId, key]，不同插件互不可见 ----
+
+    pluginGet: function (pluginId, key, fallback) {
+      let id;
+      let name;
+      try {
+        id = pluginIdOf(pluginId, "读取插件数据失败");
+        name = pluginKeyOf(key, "读取插件数据失败");
+      } catch (error) {
+        return Promise.reject(error);
+      }
+      return pluginRun("readonly", "读取插件数据失败", function (tx, box) {
+        const request = tx.objectStore(PLUGIN_STORE).get([id, name]);
+        request.onsuccess = function () {
+          box.value = request.result ? request.result.value : undefined;
+        };
+      }).then(function (value) {
+        return value === undefined ? fallback : value;
+      });
+    },
+
+    pluginSet: function (pluginId, key, value) {
+      let id;
+      let name;
+      try {
+        id = pluginIdOf(pluginId, "保存插件数据失败");
+        name = pluginKeyOf(key, "保存插件数据失败");
+      } catch (error) {
+        return Promise.reject(error);
+      }
+      return pluginRun("readwrite", "保存插件数据失败", function (tx) {
+        tx.objectStore(PLUGIN_STORE).put({ pluginId: id, key: name, value: value });
+      }).then(function () {
+        return value;
+      });
+    },
+
+    pluginDelete: function (pluginId, key) {
+      let id;
+      let name;
+      try {
+        id = pluginIdOf(pluginId, "删除插件数据失败");
+        name = pluginKeyOf(key, "删除插件数据失败");
+      } catch (error) {
+        return Promise.reject(error);
+      }
+      return pluginRun("readwrite", "删除插件数据失败", function (tx) {
+        tx.objectStore(PLUGIN_STORE).delete([id, name]);
+      });
+    },
+
+    pluginList: function (pluginId) {
+      let id;
+      try {
+        id = pluginIdOf(pluginId, "读取插件数据失败");
+      } catch (error) {
+        return Promise.reject(error);
+      }
+      return pluginRun("readonly", "读取插件数据失败", function (tx, box) {
+        const request = tx.objectStore(PLUGIN_STORE).getAll(pluginRange(id));
+        request.onsuccess = function () {
+          const result = {};
+          (request.result || []).forEach(function (row) {
+            if (!row) return;
+            // defineProperty 避免 "__proto__" 之类的键污染原型。
+            Object.defineProperty(result, String(row.key), {
+              value: row.value,
+              enumerable: true,
+              writable: true,
+              configurable: true,
+            });
+          });
+          box.value = result;
+        };
+      });
+    },
+
+    pluginClear: function (pluginId) {
+      let id;
+      try {
+        id = pluginIdOf(pluginId, "清理插件数据失败");
+      } catch (error) {
+        return Promise.reject(error);
+      }
+      return pluginRun("readwrite", "清理插件数据失败", function (tx) {
+        tx.objectStore(PLUGIN_STORE).delete(pluginRange(id));
+      });
     },
 
     estimate: function () {
