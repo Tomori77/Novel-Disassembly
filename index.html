@@ -115,20 +115,42 @@
           </section>
 
           <section class="view" data-view="clean">
-            <div class="panel">
-              <div class="panel-head">
-                <div>
-                  <h2>清洗</h2>
-                  <p>通知、请假、感言与疑似重复章节会列在这里。排除只影响导出，不改原文。</p>
+            <div class="clean-layout">
+              <div class="panel clean-left">
+                <div class="panel-head">
+                  <div>
+                    <h2>清洗</h2>
+                    <p>通知、请假、感言与疑似重复章节会列在这里。排除只影响导出，不改原文。</p>
+                  </div>
+                  <div class="actions">
+                    <button id="excludeSuspectsButton">排除全部疑似</button>
+                    <button id="restoreAllButton">恢复全部</button>
+                    <button id="reclassifyButton">重新检测</button>
+                  </div>
                 </div>
-                <div class="actions">
-                  <button id="excludeSuspectsButton">排除全部疑似</button>
-                  <button id="restoreAllButton">恢复全部</button>
-                  <button id="reclassifyButton">重新检测</button>
+                <div class="clean-summary" id="cleanSummary"></div>
+                <div class="clean-toolbar">
+                  <label class="option"><input type="checkbox" id="cleanSelectAll" /> 全选</label>
+                  <span id="cleanSelectionCount">已选 0 条</span>
+                  <button id="cleanExcludeSelected" class="danger" disabled>排除选中</button>
+                  <button id="cleanRestoreSelected" disabled>恢复选中</button>
+                  <button id="cleanClearSelection">清除选择</button>
                 </div>
+                <div class="clean-list" id="cleanList"></div>
               </div>
-              <div class="clean-summary" id="cleanSummary"></div>
-              <div class="clean-list" id="cleanList"></div>
+              <div class="panel clean-preview">
+                <div class="panel-head">
+                  <div>
+                    <h2 id="cleanPreviewTitle">未选择章节</h2>
+                    <p id="cleanPreviewMeta">点击左侧章节查看正文。</p>
+                  </div>
+                  <div class="actions">
+                    <button id="cleanPreviewToggleExclude" disabled>排除本章</button>
+                    <button id="cleanPreviewOpenReader" disabled>在阅读页打开</button>
+                  </div>
+                </div>
+                <div id="cleanPreviewBody" class="reader clean-preview-body"></div>
+              </div>
             </div>
           </section>
 

@@ -15,6 +15,10 @@
     collapsed: new Set(),
     filter: "",
     view: "source",
+    cleanSelection: new Set(),
+    cleanAnchorId: "",
+    cleanPreviewId: "",
+    cleanDragging: false,
     options: {
       includeExcluded: false,
       includeNotes: true,
@@ -25,6 +29,14 @@
   };
 
   const SAVE_DELAY = 400;
+  let cleanDrag = {
+    armed: false,
+    dragged: false,
+    startIndex: 0,
+    lastIndex: 0,
+    append: false,
+    base: null,
+  };
   const exportTarget = {
     ready: false,
     result: null,
@@ -350,6 +362,7 @@
 
   function applyStoredBook(book, chapterId, view, filter) {
     cancelPendingWrites();
+    resetCleanState();
     state.book = book;
     state.fileName = book.fileName || "";
     state.filter = filter || "";
@@ -457,6 +470,7 @@
 
   function resetBookState() {
     cancelPendingWrites();
+    resetCleanState();
     state.book = null;
     state.fileName = "";
     state.selectedId = "";
@@ -602,18 +616,33 @@
       book.stats.volumes + " 卷 · " + ND.formatCount(book.stats.chapters) + " 节 · 排除 " + excluded + " 条";
   }
 
+  function cleanCandidates() {
+    if (!state.book) return [];
+    return state.book.chapters.filter(function (chapter) {
+      return chapter.junkType !== "normal" || chapter.excluded;
+    });
+  }
+
   function renderClean() {
     const book = state.book;
     const list = $("cleanList");
     if (!book) {
       $("cleanSummary").textContent = "尚未导入文件。";
       list.innerHTML = '<div class="empty">导入并切分后显示清洗结果。</div>';
+      resetCleanState();
+      updateCleanControls();
+      renderCleanPreview();
       return;
     }
 
-    const candidates = book.chapters.filter(function (chapter) {
-      return chapter.junkType !== "normal" || chapter.excluded;
+    const candidates = cleanCandidates();
+    const visible = new Set(candidates.map(function (chapter) { return chapter.id; }));
+    state.cleanSelection.forEach(function (id) {
+      if (!visible.has(id)) state.cleanSelection.delete(id);
     });
+    if (state.cleanAnchorId && !visible.has(state.cleanAnchorId)) state.cleanAnchorId = "";
+    if (state.cleanPreviewId && !visible.has(state.cleanPreviewId)) state.cleanPreviewId = "";
+
     const junk = candidates.filter(function (chapter) { return chapter.excluded; }).length;
     const suspect = candidates.filter(function (chapter) { return !chapter.excluded; }).length;
 
@@ -624,14 +653,23 @@
 
     if (!candidates.length) {
       list.innerHTML = '<div class="empty">没有检测到可疑章节。</div>';
+      state.cleanSelection.clear();
+      state.cleanAnchorId = "";
+      state.cleanPreviewId = "";
+      updateCleanControls();
+      renderCleanPreview();
       return;
     }
 
+    const scrollTop = list.scrollTop;
     list.innerHTML = candidates
-      .map(function (chapter) {
+      .map(function (chapter, index) {
         const reasons = (chapter.reasons || []).join("；") || "手动标记";
+        const active = chapter.id === state.cleanPreviewId ? " active" : "";
+        const picked = state.cleanSelection.has(chapter.id) ? " picked" : "";
         return (
-          '<div class="clean-row">' +
+          '<div class="clean-row' + active + picked + '" data-id="' + chapter.id +
+          '" data-index="' + index + '">' +
           '<input type="checkbox" data-exclude="' + chapter.id + '"' + (chapter.excluded ? " checked" : "") + " />" +
           '<div class="clean-main">' +
           '<div class="clean-title"><button class="link-button" data-open="' + chapter.id + '">' +
@@ -645,23 +683,252 @@
         );
       })
       .join("");
+    list.scrollTop = scrollTop;
 
-    list.querySelectorAll("[data-exclude]").forEach(function (input) {
-      input.onchange = function () {
-        const chapter = allChapters().find(function (item) { return item.id === input.dataset.exclude; });
-        if (!chapter) return;
-        chapter.excluded = input.checked;
-        chapter.manual = true;
-        queueChapter(chapter);
-        renderAll();
-      };
-    });
+    updateCleanControls();
+    renderCleanPreview();
+  }
 
-    list.querySelectorAll("[data-open]").forEach(function (button) {
-      button.onclick = function () {
-        selectChapter(button.dataset.open);
-      };
+  function updateCleanRowClasses() {
+    const list = $("cleanList");
+    if (!list) return;
+    list.querySelectorAll(".clean-row").forEach(function (row) {
+      row.classList.toggle("picked", state.cleanSelection.has(row.dataset.id));
+      row.classList.toggle("active", row.dataset.id === state.cleanPreviewId);
     });
+  }
+
+  function updateCleanControls() {
+    const candidates = cleanCandidates();
+    const total = candidates.length;
+    const picked = candidates.filter(function (chapter) {
+      return state.cleanSelection.has(chapter.id);
+    }).length;
+    $("cleanSelectionCount").textContent = "已选 " + state.cleanSelection.size + " 条";
+    $("cleanExcludeSelected").disabled = state.cleanSelection.size === 0;
+    $("cleanRestoreSelected").disabled = state.cleanSelection.size === 0;
+    $("cleanClearSelection").disabled = state.cleanSelection.size === 0;
+    const selectAll = $("cleanSelectAll");
+    selectAll.disabled = total === 0;
+    selectAll.checked = total > 0 && picked === total;
+    selectAll.indeterminate = picked > 0 && picked < total;
+  }
+
+  function renderCleanPreview() {
+    const titleNode = $("cleanPreviewTitle");
+    const metaNode = $("cleanPreviewMeta");
+    const bodyNode = $("cleanPreviewBody");
+    const toggleButton = $("cleanPreviewToggleExclude");
+    const openButton = $("cleanPreviewOpenReader");
+    if (!titleNode || !metaNode || !bodyNode) return;
+
+    const chapter = allChapters().find(function (item) {
+      return item.id === state.cleanPreviewId;
+    });
+    if (!chapter) {
+      titleNode.textContent = "未选择章节";
+      metaNode.textContent = "点击左侧章节查看正文。";
+      bodyNode.textContent = "";
+      bodyNode.dataset.previewId = "";
+      toggleButton.textContent = "排除本章";
+      toggleButton.disabled = true;
+      openButton.disabled = true;
+      return;
+    }
+
+    const volume = state.book.volumes.find(function (item) {
+      return item.id === chapter.volumeId;
+    });
+    const parts = [];
+    if (volume) parts.push(volume.rawTitle);
+    if (chapter.globalIndex != null) parts.push("全书第 " + chapter.globalIndex + " 节");
+    if (chapter.localIndex != null) parts.push("卷内第 " + chapter.localIndex + " 节");
+    parts.push(ND.formatCount((chapter.body || "").length) + " 字");
+    parts.push("分类分 " + (chapter.junkScore || 0));
+    parts.push(chapter.excluded ? "已排除" : "未排除");
+    const reasons = (chapter.reasons || []).join("；");
+    if (reasons) parts.push("原因：" + reasons);
+    titleNode.textContent = chapter.title || chapter.rawTitle;
+    metaNode.textContent = parts.join(" · ");
+
+    bodyNode.textContent = chapter.body || "";
+    if (bodyNode.dataset.previewId !== chapter.id) bodyNode.scrollTop = 0;
+    bodyNode.dataset.previewId = chapter.id;
+
+    toggleButton.textContent = chapter.excluded ? "恢复本章" : "排除本章";
+    toggleButton.classList.toggle("danger", !chapter.excluded);
+    toggleButton.disabled = false;
+    openButton.disabled = false;
+  }
+
+  function setCleanPreview(id) {
+    state.cleanPreviewId = id || "";
+    updateCleanRowClasses();
+    renderCleanPreview();
+  }
+
+  function applyCleanRange(fromIndex, toIndex, append, base) {
+    const candidates = cleanCandidates();
+    const start = Math.max(0, Math.min(fromIndex, toIndex));
+    const end = Math.min(candidates.length - 1, Math.max(fromIndex, toIndex));
+    state.cleanSelection.clear();
+    if (append && base) {
+      base.forEach(function (id) { state.cleanSelection.add(id); });
+    }
+    for (let index = start; index <= end; index += 1) {
+      state.cleanSelection.add(candidates[index].id);
+    }
+    updateCleanRowClasses();
+    updateCleanControls();
+  }
+
+  function clearCleanSelection() {
+    state.cleanSelection.clear();
+    state.cleanAnchorId = "";
+    updateCleanRowClasses();
+    updateCleanControls();
+  }
+
+  function resetCleanState() {
+    state.cleanSelection.clear();
+    state.cleanAnchorId = "";
+    state.cleanPreviewId = "";
+    state.cleanDragging = false;
+    cleanDrag.armed = false;
+    cleanDrag.dragged = false;
+    cleanDrag.base = null;
+    document.body.classList.remove("selecting");
+  }
+
+  function selectedCleanChapters() {
+    const map = new Map();
+    cleanCandidates().forEach(function (chapter) {
+      map.set(chapter.id, chapter);
+    });
+    return Array.from(state.cleanSelection)
+      .map(function (id) { return map.get(id); })
+      .filter(Boolean);
+  }
+
+  function setCleanSelectedExcluded(excluded) {
+    const chapters = selectedCleanChapters();
+    if (!chapters.length) {
+      showToast("请先选择章节");
+      return;
+    }
+    chapters.forEach(function (chapter) {
+      chapter.excluded = excluded;
+      chapter.manual = true;
+      queueChapter(chapter);
+    });
+    renderAll();
+    showToast((excluded ? "已排除 " : "已恢复 ") + chapters.length + " 条");
+  }
+
+  function toggleCleanPreviewExclude() {
+    const chapter = allChapters().find(function (item) {
+      return item.id === state.cleanPreviewId;
+    });
+    if (!chapter) return;
+    chapter.excluded = !chapter.excluded;
+    chapter.manual = true;
+    queueChapter(chapter);
+    renderAll();
+    showToast(chapter.excluded ? "已排除，导出时跳过" : "已恢复");
+  }
+
+  function openCleanPreviewReader() {
+    if (state.cleanPreviewId) selectChapter(state.cleanPreviewId);
+  }
+
+  function onCleanMouseDown(event) {
+    if (event.button !== 0) return;
+    if (event.target.closest("input, button, label, a")) return;
+    const list = $("cleanList");
+    const row = event.target.closest(".clean-row");
+    if (!list || !row || !list.contains(row)) return;
+    const index = Number(row.dataset.index);
+    if (!Number.isFinite(index)) return;
+    if (!event.shiftKey) state.cleanAnchorId = row.dataset.id;
+    state.cleanDragging = false;
+    cleanDrag = {
+      armed: true,
+      dragged: false,
+      startIndex: index,
+      lastIndex: index,
+      append: !!(event.ctrlKey || event.metaKey),
+      base: event.ctrlKey || event.metaKey ? new Set(state.cleanSelection) : null,
+    };
+    event.preventDefault();
+  }
+
+  function onCleanMouseOver(event) {
+    if (!cleanDrag.armed) return;
+    if (!(event.buttons & 1)) return;
+    const row = event.target.closest(".clean-row");
+    if (!row) return;
+    const index = Number(row.dataset.index);
+    if (!Number.isFinite(index)) return;
+    if (!cleanDrag.dragged && index === cleanDrag.startIndex) return;
+    if (cleanDrag.dragged && index === cleanDrag.lastIndex) return;
+    cleanDrag.dragged = true;
+    state.cleanDragging = true;
+    document.body.classList.add("selecting");
+    applyCleanRange(cleanDrag.startIndex, index, cleanDrag.append, cleanDrag.base);
+    cleanDrag.lastIndex = index;
+  }
+
+  function onCleanMouseUp(event) {
+    if (!cleanDrag.armed) return;
+    const dragged = cleanDrag.dragged;
+    const append = cleanDrag.append;
+    const base = cleanDrag.base;
+    cleanDrag.armed = false;
+    cleanDrag.dragged = false;
+    cleanDrag.base = null;
+    if (state.cleanDragging) {
+      state.cleanDragging = false;
+      document.body.classList.remove("selecting");
+    }
+    if (dragged) return;
+
+    const row = event.target.closest ? event.target.closest(".clean-row") : null;
+    if (!row) return;
+    const id = row.dataset.id;
+    const index = Number(row.dataset.index);
+    if (!Number.isFinite(index)) return;
+
+    if (event.shiftKey) {
+      const candidates = cleanCandidates();
+      let anchorIndex = candidates.findIndex(function (chapter) {
+        return chapter.id === state.cleanAnchorId;
+      });
+      if (anchorIndex < 0) anchorIndex = index;
+      applyCleanRange(anchorIndex, index, append, base);
+      return;
+    }
+    if (event.ctrlKey || event.metaKey) {
+      if (state.cleanSelection.has(id)) state.cleanSelection.delete(id);
+      else state.cleanSelection.add(id);
+      state.cleanAnchorId = id;
+      updateCleanRowClasses();
+      updateCleanControls();
+      return;
+    }
+
+    state.cleanAnchorId = id;
+    setCleanPreview(id);
+  }
+
+  function toggleCleanSelectAll(checked) {
+    state.cleanSelection.clear();
+    if (checked) {
+      cleanCandidates().forEach(function (chapter) {
+        state.cleanSelection.add(chapter.id);
+      });
+    }
+    updateCleanRowClasses();
+    updateCleanControls();
   }
 
   function renderToc() {
@@ -987,6 +1254,7 @@
   }
 
   function rebuildBook(text) {
+    resetCleanState();
     const rules = readRules();
     saveRules(rules);
     const book = ND.splitBook(text, rules);
@@ -1015,6 +1283,7 @@
 
   function applyImportedBook(book, source) {
     cancelPendingWrites();
+    resetCleanState();
     state.book = book;
     state.fileName = book.fileName;
     state.filter = "";
@@ -1325,6 +1594,45 @@
     $("excludeSuspectsButton").onclick = bulkExcludeSuspects;
     $("restoreAllButton").onclick = restoreAll;
     $("reclassifyButton").onclick = reclassify;
+    $("cleanSelectAll").onchange = function () {
+      toggleCleanSelectAll(this.checked);
+    };
+    $("cleanExcludeSelected").onclick = function () {
+      setCleanSelectedExcluded(true);
+    };
+    $("cleanRestoreSelected").onclick = function () {
+      setCleanSelectedExcluded(false);
+    };
+    $("cleanClearSelection").onclick = clearCleanSelection;
+    $("cleanPreviewToggleExclude").onclick = toggleCleanPreviewExclude;
+    $("cleanPreviewOpenReader").onclick = openCleanPreviewReader;
+
+    const cleanList = $("cleanList");
+    cleanList.addEventListener("mousedown", onCleanMouseDown);
+    cleanList.addEventListener("mouseover", onCleanMouseOver);
+    cleanList.addEventListener("click", function (event) {
+      if (event.target.closest("[data-exclude]")) {
+        event.stopPropagation();
+        return;
+      }
+      const open = event.target.closest("[data-open]");
+      if (!open) return;
+      event.stopPropagation();
+      selectChapter(open.dataset.open);
+    });
+    cleanList.addEventListener("change", function (event) {
+      const input = event.target;
+      if (!input.matches("[data-exclude]")) return;
+      const chapter = allChapters().find(function (item) {
+        return item.id === input.dataset.exclude;
+      });
+      if (!chapter) return;
+      chapter.excluded = input.checked;
+      chapter.manual = true;
+      queueChapter(chapter);
+      renderAll();
+    });
+    document.addEventListener("mouseup", onCleanMouseUp);
     $("defaultRulesButton").onclick = function () {
       applyRules(defaultRules());
       showToast("已恢复默认规则，点击“重新切分”生效");
@@ -1370,6 +1678,13 @@
       if (tag === "input" || tag === "textarea") return;
       if (event.key === "ArrowLeft") goRelative(-1);
       if (event.key === "ArrowRight") goRelative(1);
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (state.view !== "clean" || event.key !== "Escape") return;
+      const tag = (event.target.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea") return;
+      clearCleanSelection();
     });
   }
 

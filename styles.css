@@ -526,11 +526,45 @@ textarea {
   white-space: nowrap;
 }
 
+.clean-layout {
+  display: grid;
+  grid-template-columns: minmax(340px, 0.95fr) minmax(360px, 1.05fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.clean-layout > .panel {
+  min-width: 0;
+}
+
+.clean-left .panel-head,
+.clean-preview .panel-head {
+  flex-wrap: wrap;
+}
+
 .clean-summary {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 12px;
+}
+
+.clean-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+
+.clean-toolbar .option {
+  flex: none;
+}
+
+#cleanSelectionCount {
+  margin-right: auto;
+  color: var(--muted);
+  font-size: 12.5px;
 }
 
 .clean-list {
@@ -549,15 +583,44 @@ textarea {
   align-items: start;
   padding: 10px 12px;
   border-bottom: 1px solid rgba(21, 35, 45, 0.06);
+  cursor: pointer;
+  user-select: none;
 }
 
 .clean-row:last-child {
   border-bottom: 0;
 }
 
+.clean-row:hover {
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.clean-row.picked {
+  background: #e8f4f8;
+  box-shadow: inset 3px 0 0 rgba(21, 94, 117, 0.45);
+}
+
+.clean-row.active {
+  background: #d6ecf2;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.clean-row.picked.active {
+  background: #c9e5ed;
+}
+
 .clean-row input[type="checkbox"] {
   width: auto;
   margin-top: 3px;
+}
+
+body.selecting {
+  user-select: none;
+}
+
+.clean-preview-body {
+  min-height: 420px;
+  max-height: 68vh;
 }
 
 .clean-title {
@@ -961,7 +1024,8 @@ textarea {
 
   .source-grid,
   .stats-4,
-  .export-grid {
+  .export-grid,
+  .clean-layout {
     grid-template-columns: 1fr;
   }
 
