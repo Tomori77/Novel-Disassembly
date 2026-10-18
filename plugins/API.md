@@ -2,7 +2,7 @@
 
 版本：`apiVersion: 1`
 
-本文档描述 Novel-Disassembly 的导出插件接口、词条模型、加载流程、变量、模板与安全边界。插件是普通经典脚本（非 ES module），通过 `window.ND.plugins.register(def)` 注册，兼容 `file://` 双击打开。
+本文档描述 Novel-Disassembly 的插件接口、词条模型、UI 视图、独立存储、加载流程、变量、模板与安全边界。插件是普通经典脚本（非 ES module），通过 `window.ND.plugins.register(def)` 注册，兼容 `file://` 双击打开。
 
 > 兼容性：`window.RP = window.ND` 是永久保留的别名，旧插件里的 `RP.plugins.register` 仍然有效，无需修改。
 

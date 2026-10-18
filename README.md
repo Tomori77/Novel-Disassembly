@@ -7,9 +7,18 @@
 ## 文档
 
 - [工程文档索引](docs/README.md)：架构、数据模型、插件系统、导入导出、AI、开发与测试
+- [项目状态](docs/status.md)：已实现 / 未实现 / 下一步一页看清
 - [插件 SDK](plugins/README.md)：快速上手与目录规范
 - [插件化路线](plugins/ARCHITECTURE.md)：核心边界与 v2 规划
 - [旧版单文件](legacy/README.md)：仅存档，不维护
+
+## 当前状态
+
+- **可用**：TXT / ZIP / 文件夹导入、卷节拆解、清洗（左右预览 + 拖拽多选 + 批量操作）、TXT/ZIP/EPUB/项目目录导出、manifest 回读、IndexedDB 书架与旧库迁移、插件宿主（v1 钩子 + UI 视图 + 独立存储）。
+- **官方插件**：`ai-analysis` 已实现 MVP 并默认启用（未配置模型时不发请求）；`clean-annotations` 为示例，默认停用。
+- **未实现**：搜索/统计插件、Markdown/JSON/DOCX 导出、EPUB/DOCX/Markdown 导入、插件 `importers`/`exporters`、AI 结果进入 JSON/词条导出。
+
+详见 [docs/status.md](docs/status.md)。
 
 ## 打开方式
 
@@ -64,7 +73,7 @@ python serve.py --open          # 启动后打开浏览器
 双击 `index.html`（推荐 Chrome / Edge）→ 导入 TXT、ZIP 或文件夹；或双击 `start.bat` 通过本地服务打开。
 
 1. **素材与切分**：导入原始 TXT 后自动切分；也可调整卷/章节正则，点“重新切分”。规则保存在浏览器 localStorage。
-2. **清洗**：查看被识别出的通知、请假、求票与疑似重复章节。复选框控制是否排除，只影响导出，不改原文。
+2. **清洗**：左侧可疑章节列表，点击右侧实时预览正文；支持鼠标拖拽、Ctrl/Cmd 点选、Shift 范围选、全选与批量排除/恢复。复选框只影响导出，不改原文。
 3. **卷目录**：按卷折叠浏览，点击章节进入阅读；灰色表示已排除。
 4. **阅读**：查看正文、修改标题、排除/恢复本章、导出单章；左右方向键切换上一章/下一章。
 5. **导出**：
@@ -334,3 +343,7 @@ export/           默认项目目录导出目标（不存在时按需创建）
 - 旧库降级模式（`ND.db.isLegacy()`）下 `pluginData` 可能不存在，插件存储 API 会抛出中文错误，需刷新页面完成 v2 升级
 - 模板是纯字符串替换，无表达式/条件语法；插件变量在卷目录模板中使用该卷第一个导出词条的值
 - `beforeExport`、`exporters`、`afterImport` 为预留钩子，尚未实现；插件仍只从本地 `plugins/` 加载
+- 搜索/统计插件尚未实现，当前没有全文检索或统计面板
+- Markdown/JSON/DOCX 导出、EPUB/DOCX/Markdown 导入尚未实现
+- AI 插件顺序执行、单次最多 50 章、单章最多发送 8000 字；不支持并发、自动重试、断点续跑、费用上限；结果暂不进入 JSON/词条导出；Key 明文存本地 IndexedDB；部分服务商可能被 CORS 拦截
+- 清洗页拖拽到列表边缘不会自动滚动，触摸屏拖选未适配

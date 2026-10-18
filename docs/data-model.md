@@ -149,7 +149,7 @@ v1 扁平变量保留为兼容别名。
 - 回读忽略未知字段，便于后续扩展。
 - 回读是**清洗后的文本**，不等同原始素材。
 
-## 7. Entity（v2 设计）
+## 7. Entity（v2 设计，未实现）
 
 ```js
 {
@@ -165,8 +165,25 @@ v1 扁平变量保留为兼容别名。
 }
 ```
 
-- 由 AI 分析插件产出，核心负责存储与展示。
-- JSON 导出可携带实体；TXT/ZIP/EPUB 默认不输出实体。
+- 这是 v2 设计模型，尚未进入核心表或 JSON 导出。
+- 当前 `ai-analysis` 插件把实体与摘要一起存在 `pluginData` 的 `book:<bookId>` 记录中（见下），用于界面展示；后续再迁移为 `entity` 词条。
+
+### AI 插件数据（已实现 MVP）
+
+`pluginData` 中插件 `ai-analysis` 的键：
+
+```js
+// key: "book:<bookId 或 fileName>"
+{
+  chapters: { [chapterId]: { title, summary, events, entities, model, at, error? } },
+  volumeSummaries: { [volumeId]: { summary, at } },
+  bookSummary: { summary, at },
+  updatedAt
+}
+```
+
+- `config` 另存一份全局配置（含 Key，明文存本地）。
+- 不进入核心 `chapters` 表，不影响导出。
 
 ## 8. IndexedDB 映射
 
@@ -183,7 +200,7 @@ v1 扁平变量保留为兼容别名。
 
 ## 9. JSON 导出（计划）
 
-`export-formats` 插件将输出稳定结构：
+`export-formats` 插件将输出稳定结构（尚未实现）：
 
 ```json
 {

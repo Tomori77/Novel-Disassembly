@@ -50,7 +50,7 @@ powershell -ExecutionPolicy Bypass -File tools/build-plugins.ps1
 ### 语法
 
 ```powershell
-Get-ChildItem js -Filter *.js | ForEach-Object { node --check $_.FullName }
+Get-ChildItem js,plugins -Recurse -Filter *.js | ForEach-Object { node --check $_.FullName }
 ```
 
 ### 导出回归（golden）
@@ -62,7 +62,7 @@ Get-ChildItem js -Filter *.js | ForEach-Object { node --check $_.FullName }
 - 默认选项下章节文件数量/路径一致
 - 《蛊》样例：6 卷 / 2364 章节 / 19 条排除（默认导出 2367 个章节文件）
 
-建议把对比脚本固化为 `tests/golden`，输入本地素材，输出差异报告。
+当前为手工/临时脚本对比，尚未固化为 `tests/golden`（待办）。
 
 ### 回读闭环
 
@@ -78,10 +78,13 @@ Get-ChildItem js -Filter *.js | ForEach-Object { node --check $_.FullName }
 - 用 `rp-disassembly/1` manifest 构造 entries，确认 `ND.importFromEntries` 可导入
 - 加载只调用 `RP.plugins.register` 的旧插件，确认注册与钩子生效；新导出 manifest 的 `format` 为 `novel-disassembly/1`
 
-### 浏览器
+### 浏览器与交互
 
 - Edge 无头 + 独立 `--user-data-dir` 加载 `index.html`，确认无脚本异常、导航/插件/书架存在
 - 需要等待异步（IndexedDB、fetch）时用 CDP，而不是 `--dump-dom` 立即读取
+- 清洗页：导入小样本 → 点击行右侧预览 → 拖拽/Ctrl/Shift 多选 → 批量排除/恢复
+- 插件视图：临时插件注册 `ui.views`，确认侧栏入口、mount/onShow、存储持久化、停用后回退
+- AI 插件：用 `window.fetch` mock 返回固定 JSON，不真实联网；验证配置保存、单章分析、结果持久化、401/CORS 错误提示
 - 服务模式：`python serve.py --port 8766` → `/api/health`、`/api/export`、路径穿越 400
 
 ### 进程回收（必须）

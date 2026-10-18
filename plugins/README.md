@@ -1,6 +1,6 @@
 # 插件目录
 
-Novel-Disassembly 的导出插件放在这里。插件可以规范化导出词条（标题、正文、编号、类型）、提供专用变量，并配合模板改变导出路径、文件名与内容头。
+Novel-Disassembly 的插件放在这里。插件可以规范化导出词条（标题、正文、编号、类型）、提供专用变量、注册侧栏视图，并使用独立存储。
 
 - 完整接口：`plugins/API.md`
 - 插件化拆分路线与词条/v2 设计：`plugins/ARCHITECTURE.md`
@@ -22,6 +22,15 @@ plugins/
 ├─ clean-annotations/        # 示例：去除标题末尾的更新标注，默认停用
 └─ ai-analysis/              # 官方：OpenAI 兼容摘要与实体抽取，默认启用
 ```
+
+## 官方插件
+
+| 插件 | 默认 | 状态 | 说明 |
+|---|---|---|---|
+| `ai-analysis` | 启用 | 已实现（MVP） | 手动生成章节/卷/全书摘要，抽取人物/事件/伏笔；未配置时不发请求 |
+| `clean-annotations` | 停用 | 示例 | 去除标题末尾的更新标注，提供 `cleanTitle` 变量 |
+
+搜索/统计、Markdown/JSON/DOCX 导出、EPUB/DOCX/Markdown 导入仍是设计，尚未实现。
 
 ## 快速上手
 

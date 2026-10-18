@@ -88,7 +88,7 @@
 - EPUB（标准 EPUB3）导入后卷/章数与目录一致
 - DOCX（Heading 1/2）导入后层级正确，正文无样式残留
 - Markdown（#/##）导入后卷/章正确，代码块内标题不被误识别
-- 三者导入后都能正常清洗、导出 TXT/ZIP/EPUB/Markdown/JSON/DOCX
+- 三者导入后都能正常清洗、导出 TXT/ZIP/EPUB（Markdown/JSON/DOCX 需两个格式插件都实现后验证）
 - 导入失败不产生半本书
 
 ## 7. 状态
@@ -96,4 +96,5 @@
 | 格式 | 状态 |
 |---|---|
 | TXT / 导出的 ZIP / 文件夹 | 已实现 |
-| EPUB / DOCX / Markdown | 设计完成，待实现（官方插件） |
+| EPUB / DOCX / Markdown | 设计完成，未实现（官方插件） |
+| 插件 `importers` 能力 | 未实现（设计） |

@@ -130,8 +130,9 @@ word/styles.xml
 
 - ZIP/目录：manifest 精确还原
 - 导出的 TXT：可用普通 TXT 导入重新切分（会丢失排除状态）
-- Markdown/JSON/DOCX：由 `import-formats` 插件导入
+- Markdown/JSON/DOCX：由 `import-formats` 插件导入（尚未实现）
 - 回读得到的是清洗后的文本
+- AI 摘要/实体当前只存在插件存储，不随 TXT/ZIP/EPUB 导出；JSON 计划包含 `entities`，但尚未实现
 
 ## 7. 验收
 
@@ -146,4 +147,5 @@ word/styles.xml
 | 格式 | 状态 |
 |---|---|
 | TXT / ZIP / EPUB / 项目目录 | 已实现 |
-| Markdown / JSON / DOCX | 设计完成，待实现（官方插件） |
+| Markdown / JSON / DOCX | 设计完成，未实现（官方插件） |
+| AI 结果 / 实体导出 | 未实现（JSON 计划中包含） |
