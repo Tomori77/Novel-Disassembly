@@ -15,7 +15,7 @@
 ## 当前状态
 
 - **可用**：TXT / ZIP / 文件夹导入、卷节拆解、清洗（左右预览 + 拖拽多选 + 批量操作）、TXT/ZIP/EPUB/项目目录导出、manifest 回读、IndexedDB 书架与旧库迁移、插件宿主（v1 钩子 + UI 视图 + 独立存储）。
-- **官方插件**：`ai-analysis` 0.2.2 已实现逐章分析、按卷归并、全书大纲与设定集、插件内 JSON/Markdown 导出，默认启用（未配置模型时不发请求）；`clean-annotations` 为示例，默认停用。
+- **官方插件**：`ai-analysis` 0.2.3 已实现逐章分析、按卷归并、全书大纲与设定集、插件内 JSON/Markdown 导出，默认启用（未配置模型时不发请求）；`clean-annotations` 为示例，默认停用。
 - **未实现**：搜索/统计插件、核心 Markdown/JSON/DOCX 导出、EPUB/DOCX/Markdown 导入、插件 `importers`/`exporters`、AI 实体进入核心 JSON/词条体系。
 
 详见 [docs/status.md](docs/status.md)。

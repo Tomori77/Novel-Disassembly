@@ -3,7 +3,7 @@
 
   if (!window.ND || !window.ND.plugins) return;
 
-  var PLUGIN_VERSION = "0.2.2";
+  var PLUGIN_VERSION = "0.2.3";
   var MAX_CHAPTERS = 50;
   var MAX_BODY_CHARS = 8000;
   var MAX_VOLUME_INPUT = 12000;
@@ -1069,6 +1069,89 @@
     return new Error((error && error.message) || "请求失败");
   }
 
+  function responseSnippet(value) {
+    var text;
+    try {
+      text = typeof value === "string" ? value : JSON.stringify(value);
+    } catch (error) {
+      text = String(value);
+    }
+    text = String(text || "")
+      .replace(/sk-[A-Za-z0-9_-]{10,}/g, "sk-***")
+      .replace(/(Bearer\s+)[A-Za-z0-9._-]+/gi, "$1***");
+    return text.length > 400 ? text.slice(0, 400) + "…" : text;
+  }
+
+  function extractAssistantContent(data) {
+    if (data == null) return "";
+    if (typeof data === "string") return data.trim() ? data : "";
+    var payload = data;
+    if (!payload.choices && payload.data && payload.data.choices) payload = payload.data;
+    if (!payload.choices && payload.result && payload.result.choices) payload = payload.result;
+
+    var choice = payload.choices && payload.choices[0];
+    if (choice) {
+      var message = choice.message || choice.delta || {};
+      var content = message.content != null ? message.content : choice.text;
+      if (Array.isArray(content)) {
+        content = content
+          .map(function (part) {
+            if (typeof part === "string") return part;
+            return part && (part.text || part.content) ? String(part.text || part.content) : "";
+          })
+          .join("");
+      } else if (content && typeof content === "object" && typeof content.text === "string") {
+        content = content.text;
+      }
+      if (typeof content === "string" && content.trim()) return content;
+    }
+
+    if (typeof payload.output_text === "string" && payload.output_text.trim()) {
+      return payload.output_text;
+    }
+    if (Array.isArray(payload.output)) {
+      var outputText = [];
+      payload.output.forEach(function (item) {
+        if (item && Array.isArray(item.content)) {
+          item.content.forEach(function (part) {
+            if (part && typeof part.text === "string") outputText.push(part.text);
+          });
+        }
+      });
+      if (outputText.join("").trim()) return outputText.join("");
+    }
+
+    if (Array.isArray(payload.content)) {
+      var blocks = payload.content
+        .map(function (part) {
+          if (typeof part === "string") return part;
+          return part && (part.text || part.content) ? String(part.text || part.content) : "";
+        })
+        .filter(Boolean);
+      if (blocks.join("").trim()) return blocks.join("");
+    }
+
+    if (payload.message && typeof payload.message.content === "string" && payload.message.content.trim()) {
+      return payload.message.content;
+    }
+
+    if (Array.isArray(payload.candidates)) {
+      var parts = [];
+      payload.candidates.forEach(function (candidate) {
+        if (candidate && candidate.content && Array.isArray(candidate.content.parts)) {
+          candidate.content.parts.forEach(function (part) {
+            if (part && typeof part.text === "string") parts.push(part.text);
+          });
+        }
+      });
+      if (parts.join("").trim()) return parts.join("");
+    }
+
+    if (typeof payload.response === "string" && payload.response.trim()) return payload.response;
+    if (typeof payload.text === "string" && payload.text.trim()) return payload.text;
+    return "";
+  }
+
   function requestChat(config, messages, options) {
     var settings = options || {};
     return new Promise(function (resolve, reject) {
@@ -1120,23 +1203,23 @@
               throw httpError(response.status, body);
             });
           }
-          return response.json().catch(function () {
-            throw new Error("响应不是有效 JSON");
+          return response.text().then(function (text) {
+            var trimmed = String(text || "").trim();
+            if (!trimmed) throw new Error("响应为空");
+            try {
+              return JSON.parse(trimmed);
+            } catch (error) {
+              throw new Error("响应不是有效 JSON：" + responseSnippet(trimmed));
+            }
           });
         })
         .then(function (data) {
-          var choice = data && data.choices && data.choices[0];
-          var content = choice && choice.message && choice.message.content;
-          if (Array.isArray(content)) {
-            content = content
-              .map(function (part) {
-                if (typeof part === "string") return part;
-                return part && part.text ? String(part.text) : "";
-              })
-              .join("");
-          }
-          if (typeof content !== "string" || !content.trim()) {
-            throw new Error("响应缺少 choices[0].message.content");
+          var content = extractAssistantContent(data);
+          if (!content || !content.trim()) {
+            throw new Error(
+              "响应缺少 choices[0].message.content，可能不是 OpenAI Chat Completions 兼容接口；原始响应：" +
+                responseSnippet(data),
+            );
           }
           finish();
           resolve(content);

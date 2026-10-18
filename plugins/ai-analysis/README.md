@@ -1,6 +1,6 @@
 # AI 分析插件
 
-官方插件，`id: ai-analysis`，当前版本 `0.2.2`。通过 **OpenAI 兼容接口**手动生成逐章摘要、卷归并结果与全书大纲/设定集。只修改插件自己的数据，不影响核心拆解、清洗、导入与 TXT/ZIP/EPUB 导出。
+官方插件，`id: ai-analysis`，当前版本 `0.2.3`。通过 **OpenAI 兼容接口**手动生成逐章摘要、卷归并结果与全书大纲/设定集。只修改插件自己的数据，不影响核心拆解、清洗、导入与 TXT/ZIP/EPUB 导出。
 
 ## 用途
 
@@ -113,7 +113,11 @@ Base URL 归一化：去掉末尾 `/`、`/chat/completions`、`/models`；若已
 }
 ```
 
-`max_tokens`：逐章 800、卷归并 1200、全书汇总 2000、摘要 800。超时 90 秒（`AbortController`），读取 `choices[0].message.content`。Base URL 会先归一化（补 `/v1`、去掉 `/chat/completions` 或 `/models`）再拼接端点。请求直接从浏览器发往服务商，不经过本项目服务器。
+`max_tokens`：逐章 800、卷归并 1200、全书汇总 2000、摘要 800。超时 90 秒（`AbortController`）。Base URL 会先归一化（补 `/v1`、去掉 `/chat/completions` 或 `/models`）再拼接端点。
+
+响应解析兼容常见变体：`choices[0].message.content`（字符串/数组/对象）、`choices[0].text`、`{data|result}.choices`、`output_text`/`output[]`、Anthropic `content[]`、Ollama `message.content`、Gemini `candidates[]`、纯文本 `text`/`response`。请求体仍是 OpenAI Chat Completions 格式；不是完整协议适配器。无法识别时会报错并附上脱敏后的原始响应摘要（最多 400 字）。
+
+请求优先直连；通过 `start.bat` 以 HTTP 打开时，若直连被 CORS 拦截会自动改走本地 `/api/ai/proxy`。
 
 ## Prompt 与返回
 

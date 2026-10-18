@@ -198,7 +198,7 @@
 
 ## 10. 状态
 
-**已实现（0.2.2）**：官方插件 `plugins/ai-analysis/`。
+**已实现（0.2.3）**：官方插件 `plugins/ai-analysis/`。
 
 ### 已实现
 
@@ -213,10 +213,14 @@
 - 导出 JSON/Markdown；不含 API Key。
 - 结果按书持久化，刷新后保留；支持清空本书结果。
 - 401 / 429 / CORS / 超时的可读错误提示。
+- Base URL 自动补 `/v1`；`GET /models` 拉取模型候选；HTTP 模式下 CORS 失败自动经本地 `/api/ai/proxy` 重试。
+- 响应解析兼容 `choices[0].message.content`（字符串/数组/对象）、`choices[0].text`、`{data|result}.choices`、`output_text`/`output[]`、Anthropic `content[]`、Ollama `message.content`、Gemini `candidates[]`、纯文本；无法识别时附脱敏原始响应摘要（400 字）。
 - 所有正文与摘要使用 `textContent` 渲染，避免 XSS。
 
 ### 未实现
 
+- 完整协议适配器（Anthropic/Gemini 原生请求体）；当前请求体仍为 OpenAI Chat Completions。
+- SSE / 流式响应解析。
 - 并发请求、自动重试与指数退避。
 - 成本价格表与费用上限；仅显示 token 估算。
 - 断点续跑与逐章重试/跳过按钮。
