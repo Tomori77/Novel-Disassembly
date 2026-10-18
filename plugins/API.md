@@ -445,7 +445,7 @@ plugins/
 │  ├─ plugin.json
 │  ├─ index.js
 │  └─ README.md
-└─ ai-analysis/               # 官方：OpenAI 兼容摘要与实体抽取
+└─ ai-analysis/               # 官方：逐章摘要+卷归并+全书大纲/设定集
    ├─ plugin.json
    ├─ index.js
    └─ README.md

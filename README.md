@@ -15,8 +15,8 @@
 ## 当前状态
 
 - **可用**：TXT / ZIP / 文件夹导入、卷节拆解、清洗（左右预览 + 拖拽多选 + 批量操作）、TXT/ZIP/EPUB/项目目录导出、manifest 回读、IndexedDB 书架与旧库迁移、插件宿主（v1 钩子 + UI 视图 + 独立存储）。
-- **官方插件**：`ai-analysis` 已实现 MVP 并默认启用（未配置模型时不发请求）；`clean-annotations` 为示例，默认停用。
-- **未实现**：搜索/统计插件、Markdown/JSON/DOCX 导出、EPUB/DOCX/Markdown 导入、插件 `importers`/`exporters`、AI 结果进入 JSON/词条导出。
+- **官方插件**：`ai-analysis` 0.2.0 已实现逐章分析、按卷归并、全书大纲与设定集、插件内 JSON/Markdown 导出，默认启用（未配置模型时不发请求）；`clean-annotations` 为示例，默认停用。
+- **未实现**：搜索/统计插件、核心 Markdown/JSON/DOCX 导出、EPUB/DOCX/Markdown 导入、插件 `importers`/`exporters`、AI 实体进入核心 JSON/词条体系。
 
 详见 [docs/status.md](docs/status.md)。
 
@@ -83,7 +83,7 @@ python serve.py --open          # 启动后打开浏览器
    - EPUB：单文件电子书，带卷目录
 6. **书架**：位于“素材与切分”页下方，列出最近 20 本已保存的书；可打开、删除或清空，并显示存储占用。
 7. **插件**：查看已加载插件、启用/停用、编辑导出模板并实时预览第一个内容章节的路径。插件可注册侧栏视图并使用独立存储。默认不启用导出类插件，默认导出结果与旧版一致。
-8. **AI 分析**：官方插件 `ai-analysis` 默认启用但空闲。配置 OpenAI 兼容接口后，可手动生成当前章 / 指定卷 / 全书的摘要，抽取人物、事件与伏笔；结果按书保存在本地插件存储，刷新后仍可查看。未配置时不发请求，TXT / ZIP / EPUB 导出不受影响。
+8. **AI 分析**：官方插件 `ai-analysis` 默认启用但空闲。配置 OpenAI 兼容接口后，可勾选大纲/人物/物品/地点/势力/事件/伏笔，手动逐章生成摘要、关键原文与实体，再按卷归并、汇总为全书大纲与设定集；结果按 Tab 浏览，按书保存在本地插件存储，刷新后仍可查看，并可导出 JSON/Markdown（不含 API Key）。未配置时不发请求，TXT / ZIP / EPUB 导出不受影响。
 
 ## 持久化与书架
 
@@ -252,7 +252,7 @@ TXT 严格按 `book.chapters` 顺序遍历，按当前“包含已排除章节 /
 | 插件 | 默认 | 说明 |
 |---|---|---|
 | `clean-annotations` | 停用 | 去除标题末尾的更新/求票括号标注，提供 `cleanTitle` 变量 |
-| `ai-analysis` | 启用 | OpenAI 兼容直连的章节/卷/全书摘要与人物、事件、伏笔抽取；手动触发，结果按书持久化 |
+| `ai-analysis` | 启用 | OpenAI 兼容直连的逐章摘要/关键原文、卷归并、全书大纲与人物/物品/地点/势力/事件/伏笔设定集；插件内 JSON/Markdown 导出，结果按书持久化 |
 
 `ai-analysis` 的 Key 以明文保存在当前浏览器的插件存储中，不会进入导出文件或仓库；请求直接从浏览器发往所配置的服务商。详见 [`plugins/ai-analysis/README.md`](plugins/ai-analysis/README.md)。
 
@@ -279,7 +279,7 @@ plugins/
 ├─ schema/plugin.schema.json
 ├─ _template/                # 复制它开始写插件
 ├─ clean-annotations/        # 示例：去除标题末尾更新标注，默认停用
-└─ ai-analysis/              # 官方：OpenAI 兼容摘要与实体抽取，默认启用
+└─ ai-analysis/              # 官方：逐章摘要+卷归并+全书大纲/设定集，默认启用
 tools/build-plugins.ps1      # 扫描 plugins/*/plugin.json 生成 index.js
 ```
 
@@ -357,5 +357,5 @@ export/           默认项目目录导出目标（不存在时按需创建）
 - `beforeExport`、`exporters`、`afterImport` 为预留钩子，尚未实现；插件仍只从本地 `plugins/` 加载
 - 搜索/统计插件尚未实现，当前没有全文检索或统计面板
 - Markdown/JSON/DOCX 导出、EPUB/DOCX/Markdown 导入尚未实现
-- AI 插件顺序执行、单次最多 50 章、单章最多发送 8000 字；不支持并发、自动重试、断点续跑、费用上限；结果暂不进入 JSON/词条导出；Key 明文存本地 IndexedDB；部分服务商可能被 CORS 拦截
+- AI 插件逐章单次最多 50 章、单章最多发送 8000 字，卷归并约 12000 字、全书汇总约 16000 字输入上限；顺序执行，不支持并发、自动重试、断点续跑、费用上限；失败卷会跳过，全书结果可能不完整；结果可导出插件内 JSON/Markdown，但暂不进入核心 JSON/词条；Key 明文存本地 IndexedDB；部分服务商可能被 CORS 拦截
 - 清洗页拖拽到列表边缘不会自动滚动，触摸屏拖选未适配

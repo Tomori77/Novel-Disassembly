@@ -20,14 +20,14 @@ plugins/
 ├─ schema/plugin.schema.json
 ├─ _template/                # 复制这个目录开始写插件（生成脚本会跳过）
 ├─ clean-annotations/        # 示例：去除标题末尾的更新标注，默认停用
-└─ ai-analysis/              # 官方：OpenAI 兼容摘要与实体抽取，默认启用
+└─ ai-analysis/              # 官方：逐章摘要+卷归并+全书大纲/设定集，默认启用
 ```
 
 ## 官方插件
 
 | 插件 | 默认 | 状态 | 说明 |
 |---|---|---|---|
-| `ai-analysis` | 启用 | 已实现（MVP） | 手动生成章节/卷/全书摘要，抽取人物/事件/伏笔；未配置时不发请求 |
+| `ai-analysis` | 启用 | 已实现（0.2.0） | 逐章摘要/关键原文 → 卷归并 → 全书大纲与设定集；7 类可选，支持 Tab 浏览与插件内 JSON/Markdown 导出；未配置时不发请求 |
 | `clean-annotations` | 停用 | 示例 | 去除标题末尾的更新标注，提供 `cleanTitle` 变量 |
 
 搜索/统计、Markdown/JSON/DOCX 导出、EPUB/DOCX/Markdown 导入仍是设计，尚未实现。

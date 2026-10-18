@@ -168,22 +168,39 @@ v1 扁平变量保留为兼容别名。
 - 这是 v2 设计模型，尚未进入核心表或 JSON 导出。
 - 当前 `ai-analysis` 插件把实体与摘要一起存在 `pluginData` 的 `book:<bookId>` 记录中（见下），用于界面展示；后续再迁移为 `entity` 词条。
 
-### AI 插件数据（已实现 MVP）
+### AI 插件数据（0.2.0）
 
 `pluginData` 中插件 `ai-analysis` 的键：
 
 ```js
 // key: "book:<bookId 或 fileName>"
 {
-  chapters: { [chapterId]: { title, summary, events, entities, model, at, error? } },
-  volumeSummaries: { [volumeId]: { summary, at } },
+  chapters: {
+    [chapterId]: {
+      title, summary, events, keyExcerpts, entities, model, at, error?
+    }
+  },
+  volumeSummaries: {
+    [volumeId]: {
+      summary, at,
+      outline: { summary, keyEvents } | null,
+      entities: { characters, items, places, factions, events, foreshadows },
+      error?
+    }
+  },
   bookSummary: { summary, at },
+  outline: { logline, synopsis, themes, arcs, at, model },
+  encyclopedia: {
+    characters, items, places, factions, events, foreshadows
+  },
+  entityMeta: { lastRunAt, categories },
   updatedAt
 }
 ```
 
-- `config` 另存一份全局配置（含 Key，明文存本地）。
-- 不进入核心 `chapters` 表，不影响导出。
+- `config` 另存一份全局配置（含类别与 Key，明文存本地）。
+- 旧版记录缺少 `keyExcerpts / outline / encyclopedia / entityMeta` 时按空处理，不清空已有 `chapters`。
+- 不进入核心 `chapters` 表，不影响核心导出；插件内可导出 JSON/Markdown。
 
 ## 8. IndexedDB 映射
 

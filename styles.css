@@ -1381,8 +1381,243 @@ body.selecting {
   background: #f4ebff;
 }
 
+.ai-entity.item {
+  color: #175cd3;
+  background: #eff8ff;
+}
+
+.ai-entity.place {
+  color: #067647;
+  background: #dcfae6;
+}
+
+.ai-entity.faction {
+  color: #b42318;
+  background: #fee4e2;
+}
+
 .ai-entity-note {
   opacity: 0.8;
+}
+
+.ai-categories {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+
+.ai-category-title {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.ai-category-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.ai-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #3f444b;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.ai-category input {
+  accent-color: var(--accent-dark);
+}
+
+.ai-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ai-tab {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.7);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.ai-tab:hover:not(.active) {
+  color: var(--accent-dark);
+}
+
+.ai-tab.active {
+  color: #fff;
+  background: var(--accent-dark);
+  border-color: var(--accent-dark);
+}
+
+.ai-excerpts {
+  margin-top: 10px;
+  font-size: 12.5px;
+}
+
+.ai-excerpts strong {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.ai-excerpts ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: #4a4f57;
+  line-height: 1.7;
+}
+
+.ai-volume-outline {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+  font-size: 12.5px;
+}
+
+.ai-volume-outline strong {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.ai-volume-outline ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  line-height: 1.7;
+}
+
+.ai-outline {
+  padding: 14px;
+  border: 1px solid rgba(21, 94, 117, 0.18);
+  border-radius: var(--radius-small);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.ai-logline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 10px 0 0;
+  color: #2f3135;
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.ai-logline-label {
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ai-outline-section {
+  margin-top: 16px;
+}
+
+.ai-outline-section h5,
+.ai-entity-section h5 {
+  margin: 0 0 8px;
+  color: #344054;
+  font-size: 13.5px;
+}
+
+.ai-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ai-chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: #475467;
+  background: #eef2f6;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.ai-arc {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.ai-arc h6 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.ai-arc .ai-events {
+  margin-top: 6px;
+}
+
+.ai-entity-section {
+  margin-bottom: 18px;
+}
+
+.ai-entity-section:last-child {
+  margin-bottom: 0;
+}
+
+.ai-entity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+}
+
+.ai-entity-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.ai-entity-card h5 {
+  margin: 0 0 8px;
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
+
+.ai-entity-fields {
+  display: grid;
+  gap: 5px;
+}
+
+.ai-entity-field {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ai-entity-field-label {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.ai-entity-field-value {
+  color: #3f444b;
+  overflow-wrap: anywhere;
 }
 
 .ai-error {
@@ -1414,5 +1649,18 @@ body.selecting {
 
   .ai-block-head {
     flex-direction: column;
+  }
+
+  .ai-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .ai-tab {
+    flex: 0 0 auto;
+  }
+
+  .ai-entity-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -2,7 +2,7 @@
 
 > 当前决策（2026-10）：清洗、通知/重复识别、TXT/ZIP/EPUB 导出**保留在核心**，保证零插件可用；AI 分析、搜索/统计、Markdown/JSON/DOCX 导出、EPUB/DOCX/Markdown 导入以**官方插件**提供，默认启用。本文的迁移路线作为长期参考，阶段 1/2 暂不执行。
 >
-> 已落地：`ai-analysis`（MVP）、插件 UI 视图、插件独立存储。搜索/统计、Markdown/JSON/DOCX 导出、EPUB/DOCX/Markdown 导入、`importers`/`exporters` 能力仍为设计。
+> 已落地：`ai-analysis` 0.2.0（逐章分析、卷归并、全书大纲/设定集、插件内 JSON/Markdown 导出）、插件 UI 视图、插件独立存储。搜索/统计、Markdown/JSON/DOCX 导出、EPUB/DOCX/Markdown 导入、`importers`/`exporters` 能力仍为设计。
 
 本文回答两个问题：
 
