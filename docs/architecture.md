@@ -95,7 +95,7 @@ index.html
 ## 8. 安全边界
 
 - 插件是本地 JavaScript，拥有页面权限；只启用可信代码，不联网安装。
-- 本地服务只监听 `127.0.0.1`；`/api/export` 校验 Host、Origin、Content-Type 与每个路径段，拒绝 `..`、盘符、绝对路径。
+- 本地服务只监听 `127.0.0.1`；`/api/export` 校验 Host、Origin、Content-Type 与每个路径段，拒绝 `..`、盘符、绝对路径；`/api/ai/proxy` 仅本机、限 http/https/GET/POST 与请求/响应大小，不记录 Key。
 - 写盘只发生在 `<项目>/export/` 或用户显式授权的目录内。
 - 仓库不包含小说正文、密码、密钥或代理 token。
 

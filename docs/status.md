@@ -8,7 +8,7 @@
 - **核心拆解链路可用**：TXT / 导出的 ZIP / 文件夹导入 → 卷节切分 → 清洗 → 导出 TXT / ZIP / EPUB / 项目目录 → 回读。
 - **持久化可用**：IndexedDB v2 书架、自动保存、刷新恢复、旧库迁移。
 - **插件宿主可用**：v1 导出钩子、UI 侧栏视图、插件独立存储、事件、清单生成。
-- **官方插件**：`ai-analysis` 0.2.1 已实现逐章分析、按卷归并、全书大纲与设定集、插件内 JSON/Markdown 导出，默认启用；`clean-annotations` 作为示例默认停用。
+- **官方插件**：`ai-analysis` 0.2.2 已实现逐章分析、按卷归并、全书大纲与设定集、插件内 JSON/Markdown 导出，默认启用；`clean-annotations` 作为示例默认停用。
 - **尚未实现**：搜索/统计插件、核心 Markdown/JSON/DOCX 导出、EPUB/DOCX/Markdown 导入、插件 `importers`/`exporters` 能力、AI 实体进入核心 JSON/词条体系。
 
 ## 功能矩阵
@@ -68,9 +68,9 @@
 | 插件事件 | 已实现 | `nd:book-changed` / `nd:chapter-changed` |
 | 插件清单生成 | 已实现 | `tools/build-plugins.ps1` → `plugins/index.js` |
 | `importers` / `exporters` 能力 | 未实现 | 设计已在文档中 |
-| 官方 AI 插件 | 已实现（0.2.1） | OpenAI 兼容，逐章 → 卷归并 → 全书汇总，手动触发，按书持久化 |
+| 官方 AI 插件 | 已实现（0.2.2） | OpenAI 兼容，逐章 → 卷归并 → 全书汇总，手动触发，按书持久化 |
 | AI 类别勾选 | 已实现 | 大纲/人物/物品/地点/势力/事件/伏笔，默认全选，配置持久化 |
-| AI 模型列表 | 已实现 | Base URL 自动补 `/v1`；`GET /models` 拉取模型候选 |
+| AI 模型列表 | 已实现 | Base URL 自动补 `/v1`；`GET /models` 拉取模型候选；直连 CORS 失败时经本地 `/api/ai/proxy` 重试 |
 | AI 大纲 / 设定集 | 已实现 | 卷摘要、卷大纲、全书大纲、人物/物品/地点/势力/事件/伏笔合并去重 |
 | AI 结果导出 | 已实现 | 插件内 JSON/Markdown，不含 API Key |
 | AI 实体进入核心词条 | 未实现 | 当前仅存在插件存储，不进入核心 JSON/manifest |

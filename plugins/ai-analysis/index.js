@@ -3,7 +3,7 @@
 
   if (!window.ND || !window.ND.plugins) return;
 
-  var PLUGIN_VERSION = "0.2.1";
+  var PLUGIN_VERSION = "0.2.2";
   var MAX_CHAPTERS = 50;
   var MAX_BODY_CHARS = 8000;
   var MAX_VOLUME_INPUT = 12000;
@@ -196,6 +196,54 @@
   function modelsEndpointOf(baseUrl) {
     var base = normalizeBaseUrl(baseUrl);
     return base ? base + "/models" : "";
+  }
+
+  function canUseLocalProxy() {
+    return typeof window.location !== "undefined" && window.location.protocol === "http:";
+  }
+
+  function proxyRequest(url, options) {
+    var payload = {
+      url: url,
+      method: options.method || "GET",
+      headers: options.headers || {},
+      body: options.body || "",
+    };
+    return window
+      .fetch("/api/ai/proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: options.signal,
+      })
+      .then(function (response) {
+        return response.json().catch(function () {
+          throw new Error("本地代理返回非 JSON");
+        });
+      })
+      .then(function (data) {
+        if (!data || data.ok !== true) {
+          throw new Error((data && data.error) || "本地代理失败");
+        }
+        return new Response(data.body || "", {
+          status: Number(data.status) || 502,
+          headers: { "Content-Type": data.contentType || "application/json" },
+        });
+      });
+  }
+
+  function fetchWithProxy(url, options) {
+    return window.fetch(url, options).catch(function (error) {
+      if (!(error instanceof TypeError) || !canUseLocalProxy()) throw error;
+      return proxyRequest(url, options).catch(function (proxyError) {
+        throw new Error(
+          "直连失败（可能 CORS）：" +
+            error.message +
+            "；本地代理失败：" +
+            ((proxyError && proxyError.message) || "未知错误"),
+        );
+      });
+    });
   }
 
   function bookStorageKey(book) {
@@ -1012,7 +1060,11 @@
     if (timedOut) return new Error("请求超时（90 秒）");
     if (error && error.name === "AbortError") return new Error("请求已取消");
     if (error instanceof TypeError) {
-      return new Error("网络请求失败：可能是 CORS 限制、地址不可达或 Ollama 未启动");
+      return new Error(
+        canUseLocalProxy()
+          ? "网络请求失败：自定义接口可能未开放 CORS，且本地代理不可用；请确认 start.bat 服务正在运行，或检查地址/网络"
+          : "网络请求失败：可能是 CORS 限制或地址不可达；自定义接口请用 start.bat 启动后重试（本地服务会代理请求）",
+      );
     }
     return new Error((error && error.message) || "请求失败");
   }
@@ -1051,18 +1103,17 @@
 
       if (settings.onController) settings.onController(controller);
 
-      window
-        .fetch(endpoint, {
-          method: "POST",
-          headers: headers,
-          body: JSON.stringify({
-            model: config.model,
-            messages: messages,
-            temperature: 0.2,
-            max_tokens: settings.maxTokens || 800,
-          }),
-          signal: controller.signal,
-        })
+      fetchWithProxy(endpoint, {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify({
+          model: config.model,
+          messages: messages,
+          temperature: 0.2,
+          max_tokens: settings.maxTokens || 800,
+        }),
+        signal: controller.signal,
+      })
         .then(function (response) {
           if (!response.ok) {
             return response.text().then(function (body) {
@@ -1347,7 +1398,7 @@
               '<label class="field ai-field-wide"><span>Base URL</span>' +
                 '<input data-role="baseUrl" spellcheck="false" autocomplete="off" ' +
                 'placeholder="https://api.openai.com" />' +
-                '<small class="ai-field-hint">只填基础地址，自动补 /v1；已带版本路径（如 /v1、/api/paas/v4）则原样使用。</small>' +
+                '<small class="ai-field-hint">只填基础地址，自动补 /v1；已带版本路径（如 /v1、/api/paas/v4）则原样使用。自定义接口若被 CORS 拦截，请用 start.bat 启动，插件会自动经本地服务代理。</small>' +
               "</label>" +
               '<label class="field"><span>模型</span>' +
                 '<div class="ai-model-row">' +
@@ -2575,13 +2626,12 @@
                 controller.abort();
               }, 30000);
 
-              window
-                .fetch(endpoint, {
-                  method: "GET",
-                  headers: headers,
-                  cache: "no-store",
-                  signal: controller.signal,
-                })
+              fetchWithProxy(endpoint, {
+                method: "GET",
+                headers: headers,
+                cache: "no-store",
+                signal: controller.signal,
+              })
                 .then(function (response) {
                   if (!response.ok) {
                     return response.text().then(function (body) {

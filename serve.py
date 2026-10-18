@@ -6,6 +6,7 @@ Serves the project directory plus a small write API used by the browser:
 
   GET  /api/health  -> {"ok": true, "root": "...", "exportRoot": ".../export"}
   POST /api/export  -> writes <root>/export/<book>/<path>
+  POST /api/ai/proxy -> forwards OpenAI-compatible GET/POST requests for CORS-restricted providers
 
 The server binds 127.0.0.1 only and refuses paths that escape export/.
 """
@@ -22,11 +23,17 @@ import threading
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
+from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent
 EXPORT_ROOT = ROOT / "export"
 MAX_BODY = 200 * 1024 * 1024
+AI_MAX_BODY = 5 * 1024 * 1024
+AI_MAX_RESPONSE = 20 * 1024 * 1024
+AI_TIMEOUT = 90
+AI_ALLOWED_HEADERS = {"authorization", "content-type", "accept", "x-api-key", "api-key"}
 DEFAULT_PORT = 8765
 CHUNK = 1024 * 1024
 
@@ -187,6 +194,68 @@ def write_export(data):
     return book, book_dir, count
 
 
+def read_limited(response, limit):
+    raw = response.read(limit + 1)
+    if len(raw) > limit:
+        raise ApiError(502, "目标响应超过 20MB 上限")
+    return raw.decode("utf-8", "replace")
+
+
+def proxy_ai(data):
+    if not isinstance(data, dict):
+        raise ApiError(400, "请求体必须是 JSON 对象")
+    url = data.get("url")
+    if not isinstance(url, str) or not url:
+        raise ApiError(400, "url 不能为空")
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https"):
+        raise ApiError(400, "只允许 http/https 目标地址")
+    if parts.username or parts.password:
+        raise ApiError(400, "目标地址不能包含用户名或密码")
+
+    method = str(data.get("method") or "GET").upper()
+    if method not in ("GET", "POST"):
+        raise ApiError(400, "只支持 GET / POST")
+
+    raw_headers = data.get("headers") or {}
+    if not isinstance(raw_headers, dict):
+        raise ApiError(400, "headers 必须是对象")
+    headers = {}
+    for key, value in raw_headers.items():
+        if isinstance(key, str) and isinstance(value, str) and key.lower() in AI_ALLOWED_HEADERS:
+            headers[key] = value
+
+    body = data.get("body") or ""
+    if not isinstance(body, str):
+        raise ApiError(400, "body 必须是字符串")
+    payload = None
+    if method == "POST":
+        payload = body.encode("utf-8")
+        if len(payload) > AI_MAX_BODY:
+            raise ApiError(413, "请求体超过 5MB 上限")
+
+    request = Request(url, data=payload, headers=headers, method=method)
+    try:
+        with urlopen(request, timeout=AI_TIMEOUT) as response:
+            return {
+                "ok": True,
+                "status": response.status,
+                "contentType": response.headers.get("Content-Type", ""),
+                "body": read_limited(response, AI_MAX_RESPONSE),
+            }
+    except HTTPError as error:
+        return {
+            "ok": True,
+            "status": error.code,
+            "contentType": error.headers.get("Content-Type", "") if error.headers else "",
+            "body": read_limited(error, AI_MAX_RESPONSE),
+        }
+    except URLError as error:
+        raise ApiError(502, "无法连接目标服务：" + str(error.reason))
+    except OSError as error:
+        raise ApiError(502, "目标服务连接失败：" + str(error))
+
+
 class Handler(SimpleHTTPRequestHandler):
     server_version = "NovelDisassembly/1.0"
 
@@ -280,14 +349,14 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
-        if path != "/api/export":
+        if path not in ("/api/export", "/api/ai/proxy"):
             self.send_json(404, {"ok": False, "error": "未知接口：" + path})
             return
         if not self.host_is_local():
             self.send_json(403, {"ok": False, "error": "仅允许从本机访问"})
             return
         if not self.origin_is_local():
-            self.send_json(403, {"ok": False, "error": "仅允许本机页面调用导出接口"})
+            self.send_json(403, {"ok": False, "error": "仅允许本机页面调用本地接口"})
             return
         if not self.content_type_is_json():
             self.send_json(415, {"ok": False, "error": "请求必须使用 application/json"})
@@ -301,8 +370,9 @@ class Handler(SimpleHTTPRequestHandler):
         if length <= 0:
             self.send_json(400, {"ok": False, "error": "请求体为空"})
             return
-        if length > MAX_BODY:
-            self.send_json(413, {"ok": False, "error": "请求体超过 200MB 上限"})
+        limit = AI_MAX_BODY if path == "/api/ai/proxy" else MAX_BODY
+        if length > limit:
+            self.send_json(413, {"ok": False, "error": "请求体超过上限"})
             return
 
         body = self.rfile.read(length)
@@ -313,6 +383,19 @@ class Handler(SimpleHTTPRequestHandler):
             data = json.loads(body.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
             self.send_json(400, {"ok": False, "error": "请求体不是有效的 UTF-8 JSON"})
+            return
+
+        if path == "/api/ai/proxy":
+            try:
+                result = proxy_ai(data)
+            except ApiError as error:
+                self.send_json(error.status, {"ok": False, "error": error.message})
+                return
+            except Exception as error:
+                self.log_message("ai proxy failed: %s: %s", type(error).__name__, error)
+                self.send_json(502, {"ok": False, "error": "代理请求失败：" + str(error)})
+                return
+            self.send_json(200, result)
             return
 
         try:
