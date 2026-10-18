@@ -25,6 +25,7 @@
       useEditedTitles: true,
       cleanWatermark: true,
       cleanTrailingNotes: true,
+      txtNumbering: "original",
     },
   };
 
@@ -35,6 +36,7 @@
     startIndex: 0,
     lastIndex: 0,
     append: false,
+    remove: false,
     base: null,
   };
   const exportTarget = {
@@ -789,16 +791,18 @@
     renderCleanPreview();
   }
 
-  function applyCleanRange(fromIndex, toIndex, append, base) {
+  function applyCleanRange(fromIndex, toIndex, append, base, remove) {
     const candidates = cleanCandidates();
     const start = Math.max(0, Math.min(fromIndex, toIndex));
     const end = Math.min(candidates.length - 1, Math.max(fromIndex, toIndex));
     state.cleanSelection.clear();
-    if (append && base) {
+    if ((append || remove) && base) {
       base.forEach(function (id) { state.cleanSelection.add(id); });
     }
     for (let index = start; index <= end; index += 1) {
-      state.cleanSelection.add(candidates[index].id);
+      const id = candidates[index].id;
+      if (remove) state.cleanSelection.delete(id);
+      else state.cleanSelection.add(id);
     }
     updateCleanRowClasses();
     updateCleanControls();
@@ -818,6 +822,7 @@
     state.cleanDragging = false;
     cleanDrag.armed = false;
     cleanDrag.dragged = false;
+    cleanDrag.remove = false;
     cleanDrag.base = null;
     document.body.classList.remove("selecting");
   }
@@ -871,6 +876,9 @@
     if (!list || !row || !list.contains(row)) return;
     const index = Number(row.dataset.index);
     if (!Number.isFinite(index)) return;
+    const append = !!(event.ctrlKey || event.metaKey);
+    const remove =
+      !append && !event.shiftKey && state.cleanSelection.has(row.dataset.id);
     if (!event.shiftKey) state.cleanAnchorId = row.dataset.id;
     state.cleanDragging = false;
     cleanDrag = {
@@ -878,8 +886,9 @@
       dragged: false,
       startIndex: index,
       lastIndex: index,
-      append: !!(event.ctrlKey || event.metaKey),
-      base: event.ctrlKey || event.metaKey ? new Set(state.cleanSelection) : null,
+      append: append,
+      remove: remove,
+      base: append || remove ? new Set(state.cleanSelection) : null,
     };
     event.preventDefault();
   }
@@ -896,7 +905,13 @@
     cleanDrag.dragged = true;
     state.cleanDragging = true;
     document.body.classList.add("selecting");
-    applyCleanRange(cleanDrag.startIndex, index, cleanDrag.append, cleanDrag.base);
+    applyCleanRange(
+      cleanDrag.startIndex,
+      index,
+      cleanDrag.append,
+      cleanDrag.base,
+      cleanDrag.remove,
+    );
     cleanDrag.lastIndex = index;
   }
 
@@ -907,6 +922,7 @@
     const base = cleanDrag.base;
     cleanDrag.armed = false;
     cleanDrag.dragged = false;
+    cleanDrag.remove = false;
     cleanDrag.base = null;
     if (state.cleanDragging) {
       state.cleanDragging = false;
@@ -939,6 +955,12 @@
     }
 
     state.cleanAnchorId = id;
+    // 普通点击已选行 = 取消该行选中；点击未选行只预览，不自动加入选区。
+    if (state.cleanSelection.has(id)) {
+      state.cleanSelection.delete(id);
+      updateCleanRowClasses();
+      updateCleanControls();
+    }
     setCleanPreview(id);
   }
 
@@ -1586,6 +1608,7 @@
       useEditedTitles: $("optUseEditedTitles").checked,
       cleanWatermark: $("optCleanWatermark").checked,
       cleanTrailingNotes: $("optCleanTrailingNotes").checked,
+      txtNumbering: $("optTxtNumbering").value,
     };
   }
 
@@ -1595,6 +1618,11 @@
     $("optUseEditedTitles").checked = options.useEditedTitles !== false;
     $("optCleanWatermark").checked = options.cleanWatermark !== false;
     $("optCleanTrailingNotes").checked = options.cleanTrailingNotes !== false;
+    const numbering = options.txtNumbering;
+    $("optTxtNumbering").value =
+      numbering === "global-prefix" || numbering === "global-renumber"
+        ? numbering
+        : "original";
   }
 
   function persistOptions() {
@@ -1825,7 +1853,7 @@
       };
     });
 
-    ["optIncludeExcluded", "optIncludeNotes", "optUseEditedTitles", "optCleanWatermark", "optCleanTrailingNotes"].forEach(function (id) {
+    ["optIncludeExcluded", "optIncludeNotes", "optUseEditedTitles", "optCleanWatermark", "optCleanTrailingNotes", "optTxtNumbering"].forEach(function (id) {
       $(id).onchange = persistOptions;
     });
 

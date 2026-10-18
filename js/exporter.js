@@ -31,22 +31,51 @@
     return ND.cleanExportBody(chapter.body || "", options);
   }
 
+  function includeChapter(chapter, options) {
+    if (chapter.type === "volumeNote" && !options.includeNotes) return false;
+    if (chapter.type === "preface" && !options.includeNotes) return false;
+    if (chapter.excluded && !options.includeExcluded) return false;
+    return true;
+  }
+
+  // ZIP / 文件夹 / EPUB 沿用按卷数组分组；TXT 使用 collectReadingOrder。
   function collect(book, options) {
     const groups = [];
     for (const volume of book.volumes) {
       const chapters = volume.chapters.filter(function (chapter) {
-        if (chapter.type === "volumeNote" && !options.includeNotes) return false;
-        if (chapter.type === "preface" && !options.includeNotes) return false;
-        if (chapter.excluded && !options.includeExcluded) return false;
-        return true;
+        return includeChapter(chapter, options);
       });
       if (chapters.length) groups.push({ volume: volume, chapters: chapters });
     }
     return groups;
   }
 
+  // 严格按 book.chapters 的阅读顺序分组，仅在 volumeId 变化时开新组。
+  function collectReadingOrder(book, options) {
+    const byId = new Map();
+    (book.volumes || []).forEach(function (volume) {
+      byId.set(volume.id, volume);
+    });
+    const groups = [];
+    let current = null;
+    let currentVolumeId = null;
+    (book.chapters || []).forEach(function (chapter) {
+      if (!includeChapter(chapter, options)) return;
+      if (!current || chapter.volumeId !== currentVolumeId) {
+        current = {
+          volume: byId.get(chapter.volumeId) || null,
+          chapters: [],
+        };
+        groups.push(current);
+        currentVolumeId = chapter.volumeId;
+      }
+      current.chapters.push(chapter);
+    });
+    return groups;
+  }
+
   function volumeHeading(volume) {
-    if (volume.synthetic) return "";
+    if (!volume || volume.synthetic) return "";
     return volume.rawTitle;
   }
 
@@ -151,7 +180,7 @@
   }
 
   function groupHeading(items, volume) {
-    if (volume.synthetic) return "";
+    if (!volume || volume.synthetic) return "";
     const entryTitle = items.length ? items[0].entry.volume.title || "" : "";
     return entryTitle || volumeHeading(volume);
   }
@@ -285,18 +314,76 @@
     return manifestFromPlan(opts, planExport(book, opts));
   };
 
+  const TXT_NUMBERING_MODES = {
+    original: true,
+    "global-prefix": true,
+    "global-renumber": true,
+  };
+
+  function normalizeTxtNumbering(value) {
+    return TXT_NUMBERING_MODES[value] ? value : "original";
+  }
+
+  function noticeTitle(title) {
+    const text = String(title || "通知").trim() || "通知";
+    if (/^(?:通知|公告|单章)\s*[:：]/.test(text)) return text;
+    return "通知：" + text;
+  }
+
+  function renumberedTitle(item, number) {
+    const type = item.entry.chapter.type || "chapter";
+    if (type === "notice") return noticeTitle(item.title);
+    if (type === "volumeNote") return "卷首语";
+    if (number == null) return item.title;
+    const parsed = ND.parseChapterLabel(item.title);
+    const name = parsed.name || item.title;
+    return "第 " + number + " 章 " + name;
+  }
+
+  // TXT 专属：编号只改标题行（内容头），卷标题与正文不动。
+  function txtHeader(item, mode, templates, renumber) {
+    if (mode === "original") return item.header;
+
+    const chapterType = item.entry.chapter.type || "chapter";
+    const globalIndex = item.entry.index.global != null ? item.entry.index.global : null;
+
+    if (mode === "global-prefix") {
+      if (globalIndex == null || chapterType === "notice" || chapterType === "volumeNote") {
+        return item.header;
+      }
+      const suffix = "（全书第 " + globalIndex + " 节）";
+      const head = item.header == null ? "" : String(item.header);
+      return head ? head + suffix : item.title + suffix;
+    }
+
+    const title = renumberedTitle(item, renumber);
+    const variables = Object.assign({}, item.variables, { title: title });
+    const head = ND.plugins.render(templates.header, variables);
+    return head || title;
+  }
+
   ND.buildPlainText = function (book, options) {
     const opts = normalizeOptions(options);
+    const numbering = normalizeTxtNumbering(options && options.txtNumbering);
     const templates = ND.plugins.templates();
-    const groups = collect(book, opts);
+    const groups = collectReadingOrder(book, opts);
     const parts = [];
+    let renumber = 0;
     for (const group of groups) {
       const items = prepareGroup(book, group, opts, templates);
       if (!items.length) continue;
       const heading = groupHeading(items, group.volume);
       if (heading) parts.push(heading + "\n");
       const chapterBlocks = items.map(function (item) {
-        return composeContent(item.header, item.body);
+        let number = null;
+        if (numbering === "global-renumber") {
+          const type = item.entry.chapter.type || "chapter";
+          if (type === "chapter" || type === "preface") {
+            renumber += 1;
+            number = renumber;
+          }
+        }
+        return composeContent(txtHeader(item, numbering, templates, number), item.body);
       });
       parts.push(chapterBlocks.join("\n\n———\n\n"));
     }

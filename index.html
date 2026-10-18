@@ -202,7 +202,7 @@
               <div class="panel-head">
                 <div>
                   <h2>导出</h2>
-                  <p>保留原始卷 / 节编号；默认跳过已排除的通知与请假段落。</p>
+                  <p>按全书阅读顺序输出；TXT 可选择原始编号、全书序号或连续重编号；默认跳过已排除的通知与请假段落。</p>
                 </div>
               </div>
 
@@ -212,6 +212,13 @@
                 <label class="option"><input id="optUseEditedTitles" type="checkbox" checked /> 使用编辑后的标题</label>
                 <label class="option"><input id="optCleanWatermark" type="checkbox" checked /> 清除盗版 / 网址水印行</label>
                 <label class="option"><input id="optCleanTrailingNotes" type="checkbox" checked /> 清除章末作者附言</label>
+                <label class="option"><span>TXT 章节编号</span>
+                  <select id="optTxtNumbering">
+                    <option value="original">原始编号（保持原样）</option>
+                    <option value="global-prefix">保留原名 + 全书序号</option>
+                    <option value="global-renumber">全书连续重编号</option>
+                  </select>
+                </label>
               </div>
 
               <p class="hint export-target-hint" id="exportTargetHint">正在检测导出目标…</p>
@@ -219,7 +226,7 @@
               <div class="export-grid">
                 <div class="export-card">
                   <h3>TXT</h3>
-                  <p>单文件，保留卷标题与原始章节名。</p>
+                  <p>单文件，按阅读顺序保留卷标题与章节名，可使用全书编号。</p>
                   <button id="exportTxtButton2" class="primary">导出 TXT</button>
                 </div>
                 <div class="export-card">
