@@ -1,6 +1,6 @@
 # AI 分析插件
 
-官方插件，`id: ai-analysis`，当前版本 `0.2.0`。通过 **OpenAI 兼容接口**手动生成逐章摘要、卷归并结果与全书大纲/设定集。只修改插件自己的数据，不影响核心拆解、清洗、导入与 TXT/ZIP/EPUB 导出。
+官方插件，`id: ai-analysis`，当前版本 `0.2.1`。通过 **OpenAI 兼容接口**手动生成逐章摘要、卷归并结果与全书大纲/设定集。只修改插件自己的数据，不影响核心拆解、清洗、导入与 TXT/ZIP/EPUB 导出。
 
 ## 用途
 
@@ -20,8 +20,8 @@
 | 字段 | 说明 |
 |---|---|
 | 预设 | 只填充 Base URL 与建议模型，不覆盖已填写的 API Key |
-| Base URL | 接口根地址，如 `https://api.openai.com/v1` |
-| 模型 | 服务商提供的模型名 |
+| Base URL | 只填基础地址，如 `https://api.openai.com`；自动补 `/v1`，已带版本路径（`/v1`、`/api/paas/v4`）则原样使用 |
+| 模型 | 可手动填写，或点“拉取模型”从 `/models` 获取候选 |
 | API Key | `type=password`；Ollama 等本地服务可留空 |
 | 跳过已排除章节 | 默认开启，只影响 AI 分析范围，不改变导出 |
 
@@ -44,6 +44,7 @@
 ### 按钮
 
 - **保存配置**：写入插件存储，刷新页面后保留。
+- **拉取模型**：请求 `<基础地址>/v1/models`（已带版本路径则用原路径），把返回的模型 id 填入下拉候选；可继续手动输入。
 - **测试连接**：发送“回复 OK”的最小请求（`max_tokens: 8`），不写入分析结果。
 - **清除 Key**：清空 API Key 并保存配置。
 
@@ -51,10 +52,10 @@
 
 | 预设 | Base URL | 建议模型 |
 |---|---|---|
-| OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` |
-| DeepSeek | `https://api.deepseek.com/v1` | `deepseek-chat` |
+| OpenAI | `https://api.openai.com` | `gpt-4o-mini` |
+| DeepSeek | `https://api.deepseek.com` | `deepseek-chat` |
 | GLM | `https://open.bigmodel.cn/api/paas/v4` | `glm-4-flash` |
-| Ollama | `http://127.0.0.1:11434/v1` | `qwen2.5:7b` |
+| Ollama | `http://127.0.0.1:11434` | `qwen2.5:7b` |
 | 自定义 | 空 | 空 |
 
 ## 分析范围与 token
@@ -95,10 +96,13 @@
 ## API 调用
 
 ```text
-POST <Base URL 去掉末尾 /> + /chat/completions
+POST <归一化 Base URL> + /chat/completions
+GET  <归一化 Base URL> + /models
 Content-Type: application/json
 Authorization: Bearer <API Key>   // Key 非空时
 ```
+
+Base URL 归一化：去掉末尾 `/`、`/chat/completions`、`/models`；若已包含 `/v1`、`/v2`、`/api/paas/v4` 等版本段则原样使用，否则自动追加 `/v1`。
 
 ```json
 {
@@ -109,7 +113,7 @@ Authorization: Bearer <API Key>   // Key 非空时
 }
 ```
 
-`max_tokens`：逐章 800、卷归并 1200、全书汇总 2000、摘要 800。超时 90 秒（`AbortController`），读取 `choices[0].message.content`。若 Base URL 已以 `/chat/completions` 结尾则不再追加。请求直接从浏览器发往服务商，不经过本项目服务器。
+`max_tokens`：逐章 800、卷归并 1200、全书汇总 2000、摘要 800。超时 90 秒（`AbortController`），读取 `choices[0].message.content`。Base URL 会先归一化（补 `/v1`、去掉 `/chat/completions` 或 `/models`）再拼接端点。请求直接从浏览器发往服务商，不经过本项目服务器。
 
 ## Prompt 与返回
 

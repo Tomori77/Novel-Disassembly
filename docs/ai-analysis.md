@@ -13,11 +13,11 @@
 
 | 预设 | Base URL 示例 | 说明 |
 |---|---|---|
-| OpenAI | `https://api.openai.com/v1` | 需 key |
-| DeepSeek | `https://api.deepseek.com/v1` | 需 key |
-| GLM | `https://open.bigmodel.cn/api/paas/v4` | 需 key |
-| Ollama | `http://127.0.0.1:11434/v1` | 通常无需 key |
-| 自定义 | 用户填写 | 需 key |
+| OpenAI | `https://api.openai.com` | 需 key；自动补 `/v1` |
+| DeepSeek | `https://api.deepseek.com` | 需 key；自动补 `/v1` |
+| GLM | `https://open.bigmodel.cn/api/paas/v4` | 需 key；保留版本路径 |
+| Ollama | `http://127.0.0.1:11434` | 通常无需 key；自动补 `/v1` |
+| 自定义 | 用户填写 | 自动补 `/v1`，已带版本路径则原样使用 |
 
 配置对象：
 
@@ -29,6 +29,8 @@
 ```
 
 - `categories` 默认全选；复选框变化立即写入配置，点“保存配置”也会保存。
+- **Base URL 归一化**：去掉末尾 `/`、`/chat/completions`、`/models`；若已包含 `/v1`、`/v2`、`/api/paas/v4` 等版本段则原样使用，否则自动追加 `/v1`。
+- **拉取模型**：`GET <归一化 Base URL>/models`，把返回的模型 id 填入输入框下拉候选；失败时保留手动输入。
 - Key 只保存在本地 IndexedDB（插件命名空间），不写入仓库、导出文件或日志。
 
 ## 3. 触发与流程
@@ -196,7 +198,7 @@
 
 ## 10. 状态
 
-**已实现（0.2.0）**：官方插件 `plugins/ai-analysis/`。
+**已实现（0.2.1）**：官方插件 `plugins/ai-analysis/`。
 
 ### 已实现
 

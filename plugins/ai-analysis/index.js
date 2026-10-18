@@ -3,7 +3,7 @@
 
   if (!window.ND || !window.ND.plugins) return;
 
-  var PLUGIN_VERSION = "0.2.0";
+  var PLUGIN_VERSION = "0.2.1";
   var MAX_CHAPTERS = 50;
   var MAX_BODY_CHARS = 8000;
   var MAX_VOLUME_INPUT = 12000;
@@ -12,10 +12,10 @@
   var TIMEOUT_MS = 90000;
 
   var PRESETS = {
-    openai: { label: "OpenAI", baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini" },
-    deepseek: { label: "DeepSeek", baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat" },
+    openai: { label: "OpenAI", baseUrl: "https://api.openai.com", model: "gpt-4o-mini" },
+    deepseek: { label: "DeepSeek", baseUrl: "https://api.deepseek.com", model: "deepseek-chat" },
     glm: { label: "GLM", baseUrl: "https://open.bigmodel.cn/api/paas/v4", model: "glm-4-flash" },
-    ollama: { label: "Ollama", baseUrl: "http://127.0.0.1:11434/v1", model: "qwen2.5:7b" },
+    ollama: { label: "Ollama", baseUrl: "http://127.0.0.1:11434", model: "qwen2.5:7b" },
     custom: { label: "自定义", baseUrl: "", model: "" },
   };
   var PRESET_ORDER = ["openai", "deepseek", "glm", "ollama", "custom"];
@@ -180,11 +180,22 @@
     return !!(String(config.baseUrl || "").trim() && String(config.model || "").trim());
   }
 
-  function endpointOf(baseUrl) {
+  function normalizeBaseUrl(baseUrl) {
     var base = String(baseUrl || "").trim().replace(/\/+$/, "");
     if (!base) return "";
-    if (/\/chat\/completions$/i.test(base)) return base;
-    return base + "/chat/completions";
+    base = base.replace(/\/chat\/completions$/i, "").replace(/\/models$/i, "");
+    if (/(^|\/)v\d+([/]|$)/i.test(base)) return base;
+    return base + "/v1";
+  }
+
+  function endpointOf(baseUrl) {
+    var base = normalizeBaseUrl(baseUrl);
+    return base ? base + "/chat/completions" : "";
+  }
+
+  function modelsEndpointOf(baseUrl) {
+    var base = normalizeBaseUrl(baseUrl);
+    return base ? base + "/models" : "";
   }
 
   function bookStorageKey(book) {
@@ -1335,10 +1346,15 @@
             '<div class="ai-config-grid">' +
               '<label class="field ai-field-wide"><span>Base URL</span>' +
                 '<input data-role="baseUrl" spellcheck="false" autocomplete="off" ' +
-                'placeholder="https://api.openai.com/v1" />' +
+                'placeholder="https://api.openai.com" />' +
+                '<small class="ai-field-hint">只填基础地址，自动补 /v1；已带版本路径（如 /v1、/api/paas/v4）则原样使用。</small>' +
               "</label>" +
               '<label class="field"><span>模型</span>' +
-                '<input data-role="model" spellcheck="false" autocomplete="off" placeholder="gpt-4o-mini" />' +
+                '<div class="ai-model-row">' +
+                  '<input data-role="model" list="aiModelList" spellcheck="false" autocomplete="off" placeholder="gpt-4o-mini" />' +
+                  '<button data-role="fetchModels">拉取模型</button>' +
+                "</div>" +
+                '<datalist id="aiModelList" data-role="modelList"></datalist>' +
               "</label>" +
               '<label class="field"><span>API Key</span>' +
                 '<input data-role="apiKey" type="password" spellcheck="false" autocomplete="off" ' +
@@ -1698,6 +1714,7 @@
               refs.skipExcluded.disabled = busy;
               refs.save.disabled = busy;
               refs.test.disabled = busy;
+              refs.fetchModels.disabled = busy;
               refs.clearKey.disabled = busy;
               CATEGORY_ORDER.forEach(function (key) {
                 if (refs.categoryInputs[key]) refs.categoryInputs[key].disabled = busy;
@@ -2530,6 +2547,87 @@
                 });
             }
 
+            function fetchModels() {
+              var config = readConfigInputs();
+              var endpoint = modelsEndpointOf(config.baseUrl);
+              if (!endpoint) {
+                setConfigNotice("请先填写 Base URL", "warn");
+                return;
+              }
+              if (!/^https?:\/\//i.test(endpoint)) {
+                setConfigNotice("Base URL 需以 http:// 或 https:// 开头", "danger");
+                return;
+              }
+
+              state.busy = "models";
+              renderControls();
+              setConfigNotice("正在拉取模型…", "");
+              refs.fetchModels.textContent = "拉取中…";
+
+              var headers = {};
+              var key = String(config.apiKey || "").trim();
+              if (key) headers.Authorization = "Bearer " + key;
+
+              var controller = new AbortController();
+              var timedOut = false;
+              var timer = setTimeout(function () {
+                timedOut = true;
+                controller.abort();
+              }, 30000);
+
+              window
+                .fetch(endpoint, {
+                  method: "GET",
+                  headers: headers,
+                  cache: "no-store",
+                  signal: controller.signal,
+                })
+                .then(function (response) {
+                  if (!response.ok) {
+                    return response.text().then(function (body) {
+                      throw httpError(response.status, body);
+                    });
+                  }
+                  return response.json().catch(function () {
+                    throw new Error("模型列表不是有效 JSON");
+                  });
+                })
+                .then(function (data) {
+                  var list = Array.isArray(data) ? data : (data && (data.data || data.models)) || [];
+                  var ids = [];
+                  list.forEach(function (item) {
+                    var id =
+                      typeof item === "string"
+                        ? item
+                        : item && (item.id || item.name || item.model);
+                    if (id && ids.indexOf(String(id)) < 0) ids.push(String(id));
+                  });
+                  ids.sort();
+                  refs.modelList.innerHTML = ids
+                    .map(function (id) {
+                      return '<option value="' + ND.escapeHtml(id) + '"></option>';
+                    })
+                    .join("");
+                  if (!refs.model.value.trim() && ids.length) refs.model.value = ids[0];
+                  if (ids.length) {
+                    setConfigNotice("已拉取 " + ids.length + " 个模型，可从输入框下拉选择", "success");
+                    ctx.toast("已拉取 " + ids.length + " 个模型");
+                  } else {
+                    setConfigNotice("服务未返回模型列表，可手动填写模型名", "warn");
+                  }
+                })
+                .catch(function (error) {
+                  var message = normalizeRequestError(error, timedOut).message;
+                  setConfigNotice("拉取模型失败：" + message, "danger");
+                })
+                .then(function () {
+                  clearTimeout(timer);
+                  state.busy = "";
+                  refs.fetchModels.textContent = "拉取模型";
+                  renderControls();
+                });
+            }
+
             function failEntry(chapter, config, error) {
               return {
                 title: chapterTitle(chapter),
@@ -3080,6 +3178,7 @@
             refs.volume.onchange = renderRange;
             refs.save.onclick = saveConfig;
             refs.test.onclick = testConnection;
+            refs.fetchModels.onclick = fetchModels;
             refs.clearKey.onclick = clearKey;
             refs.start.onclick = analyze;
             refs.build.onclick = buildEncyclopedia;

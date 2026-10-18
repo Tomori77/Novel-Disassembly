@@ -3,7 +3,7 @@ window.ND_PLUGIN_INDEX = [
     {
         "id":  "ai-analysis",
         "name":  "AI 分析",
-        "version":  "0.2.0",
+        "version":  "0.2.1",
         "apiVersion":  1,
         "entry":  "ai-analysis/index.js",
         "enabled":  true,
